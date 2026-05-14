@@ -3,7 +3,7 @@ import json
 import logging
 import time
 from threading import Lock
-from typing import Optional, Dict, Any, List
+from typing import TYPE_CHECKING, Optional, Dict, Any, List
 from openai import OpenAI
 from app.config import settings
 from app.services.analytics import AnalyticsService
@@ -12,6 +12,9 @@ from app.utils.errors import safe_llm_error
 
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from app.services.llm_credential_resolver import ResolvedProvider
 
 
 MATH_RENDERING_RULES = """数学公式输出规则：
@@ -469,6 +472,89 @@ class LLMService:
                     )
                     self._clients[provider] = client
         return client
+
+    def complete_chat(
+        self,
+        resolved: "ResolvedProvider",
+        messages: List[Dict[str, str]],
+        *,
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
+        prompt_profile: str = "three_stage",
+        system_prompt_override: Optional[str] = None,
+        tutor_context: Optional[Dict[str, Any]] = None,
+        agent_type: str,
+        user_id: Optional[str],
+        session_id: Optional[int],
+        analytics: Optional[AnalyticsService],
+        model: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Generate a reply using an already resolved user/global provider."""
+        selected_model = model or resolved.default_model
+        detected_learning_phase = self.detect_learning_phase(self._latest_user_content(messages))
+        learning_phase = detected_learning_phase
+        normalized_tutor_context = dict(tutor_context or {})
+        if prompt_profile == "three_stage":
+            previous_learning_phase = str(normalized_tutor_context.get("learning_phase") or "")
+            if detected_learning_phase == "general" and previous_learning_phase:
+                learning_phase = previous_learning_phase
+            normalized_tutor_context["learning_phase"] = learning_phase
+            normalized_tutor_context["learning_phase_instruction"] = self._learning_phase_instruction(learning_phase)
+
+        system_prompt = self._build_system_prompt(
+            prompt_profile=prompt_profile,
+            tutor_context=normalized_tutor_context,
+            system_prompt_override=system_prompt_override,
+        )
+        chat_messages = self._build_chat_messages(
+            system_prompt=system_prompt,
+            messages=messages,
+            inline_system_prompt=self._should_inline_system_prompt(resolved.provider_id, selected_model),
+        )
+
+        start_time = time.time()
+        try:
+            client = OpenAI(api_key=resolved.api_key, base_url=resolved.base_url)
+            response = client.chat.completions.create(
+                model=selected_model,
+                messages=chat_messages,
+                temperature=temperature if temperature is not None else settings.OPENAI_TEMPERATURE,
+                max_tokens=max_tokens if max_tokens is not None else settings.OPENAI_MAX_TOKENS,
+            )
+            content = response.choices[0].message.content
+            duration_ms = (time.time() - start_time) * 1000
+            usage = getattr(response, "usage", None)
+            usage_payload = {}
+            if usage:
+                usage_payload = {
+                    "prompt_tokens": getattr(usage, "prompt_tokens", None),
+                    "completion_tokens": getattr(usage, "completion_tokens", None),
+                    "total_tokens": getattr(usage, "total_tokens", None),
+                }
+
+            self._safe_log_llm_call(
+                user_id=user_id,
+                session_id=session_id,
+                agent_type=agent_type,
+                prompt_length=sum(len(message["content"]) for message in chat_messages),
+                response_length=len(content or ""),
+                duration_ms=duration_ms,
+                analytics=analytics,
+            )
+
+            return {
+                "message": {"role": "assistant", "content": content},
+                "provider": resolved.provider_id,
+                "model": selected_model,
+                "prompt_profile": prompt_profile,
+                "learning_phase": learning_phase,
+                "usage": usage_payload,
+                "latency_ms": duration_ms,
+                "credential_source": resolved.source,
+                "credential_fingerprint": resolved.fingerprint,
+            }
+        except Exception as e:
+            return {"error": safe_llm_error(e)}
 
     def chat(
         self,

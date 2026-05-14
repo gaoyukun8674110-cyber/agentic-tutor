@@ -11,7 +11,7 @@ import {
   type TutorConversationDetail,
   type TutorConversationSummary,
 } from '../../utils/chatApi';
-import { getUserFacingError, isAbortError } from '../../utils/apiClient';
+import { ApiError, getUserFacingError, isAbortError } from '../../utils/apiClient';
 import type { Language } from '../../utils/settings';
 import { tutorQueryKeys } from './tutorQueryKeys';
 import type { ChatMessage, ChatRole, TimerState } from '../../components/tutor/types';
@@ -45,6 +45,7 @@ interface TutorChatState {
   input: string;
   isSending: boolean;
   errorBanner: string | null;
+  errorCode: string | null;
   lastFailedRequest: FailedSendRequest | null;
 }
 
@@ -68,6 +69,7 @@ const initialState: TutorChatState = {
   input: '',
   isSending: false,
   errorBanner: null,
+  errorCode: null,
   lastFailedRequest: null,
 };
 
@@ -89,6 +91,7 @@ function tutorChatReducer(state: TutorChatState, action: TutorChatAction): Tutor
         input: '',
         isSending: false,
         errorBanner: null,
+        errorCode: null,
         lastFailedRequest: null,
       };
     case 'apply-conversation':
@@ -105,6 +108,7 @@ function tutorChatReducer(state: TutorChatState, action: TutorChatAction): Tutor
         input: '',
         isSending: false,
         errorBanner: null,
+        errorCode: null,
         lastFailedRequest: null,
       };
     case 'append-timer-message':
@@ -148,14 +152,23 @@ function normalizeLearningPhase(phase?: string | null): LearningPhase {
   return 'general';
 }
 
-function toChatMessages(messages: { id?: string | number; role: string; content: string; label?: string | null }[]): ChatMessage[] {
-  return messages
-    .filter((message) => message.role === 'user' || message.role === 'assistant')
-    .map((message) => ({
+function toChatMessages(
+  messages: { id?: string | number; role: string; content: string; label?: string | null }[],
+  credentialSource?: 'user' | 'global' | 'local',
+  credentialFingerprint?: string | null,
+): ChatMessage[] {
+  const visibleMessages = messages.filter((message) => message.role === 'user' || message.role === 'assistant');
+  const lastAssistantIndex = visibleMessages.reduce(
+    (lastIndex, message, index) => (message.role === 'assistant' ? index : lastIndex),
+    -1,
+  );
+  return visibleMessages.map((message, index) => ({
       id: String(message.id ?? createMessageId()),
       role: message.role as ChatRole,
       content: message.content,
       label: message.label || undefined,
+      credentialSource: message.role === 'assistant' && index === lastAssistantIndex ? credentialSource : undefined,
+      credentialFingerprint: message.role === 'assistant' && index === lastAssistantIndex ? credentialFingerprint : undefined,
     }));
 }
 
@@ -249,7 +262,7 @@ export function useTutorChat({
   }, []);
 
   const dismissErrorBanner = useCallback(() => {
-    dispatch({ type: 'patch', updates: { errorBanner: null } });
+    dispatch({ type: 'patch', updates: { errorBanner: null, errorCode: null } });
   }, []);
 
   const executeSend = useCallback(
@@ -262,6 +275,7 @@ export function useTutorChat({
         updates: {
           isSending: true,
           errorBanner: null,
+          errorCode: null,
           activeMaterialContext: null,
         },
       });
@@ -275,7 +289,12 @@ export function useTutorChat({
           'Tutor';
 
         if (response.messages?.length) {
-          dispatch({ type: 'patch', updates: { messages: toChatMessages(response.messages) } });
+          dispatch({
+            type: 'patch',
+            updates: {
+              messages: toChatMessages(response.messages, response.credential_source, response.credential_fingerprint),
+            },
+          });
         } else {
           dispatch({
             type: 'patch',
@@ -287,6 +306,8 @@ export function useTutorChat({
                   role: 'assistant',
                   label: profileLabel,
                   content: response.message.content,
+                  credentialSource: response.credential_source,
+                  credentialFingerprint: response.credential_fingerprint,
                 },
               ],
             },
@@ -307,6 +328,7 @@ export function useTutorChat({
               nextMessages.filter((message) => message.role === 'user').length,
             currentSummary: response.conversation?.summary ?? state.currentSummary,
             activeMaterialContext: response.material_context ?? null,
+            errorCode: null,
             lastFailedRequest: null,
           },
         });
@@ -329,11 +351,11 @@ export function useTutorChat({
         }
 
         const message = getUserFacingError(error);
-        const unavailableLabel = t('Model unavailable: ', 'Model unavailable: ');
         dispatch({
           type: 'patch',
           updates: {
-            errorBanner: `${unavailableLabel}${message}`,
+            errorBanner: message,
+            errorCode: error instanceof ApiError ? error.code : null,
             lastFailedRequest: { request, nextMessages, profileId },
           },
         });
@@ -346,7 +368,7 @@ export function useTutorChat({
         }
       }
     },
-    [currentProfile?.name, profiles, queryClient, state.currentSummary, t],
+    [currentProfile?.name, profiles, queryClient, state.currentSummary],
   );
 
   const sendMessage = useCallback(
@@ -396,6 +418,7 @@ export function useTutorChat({
           selectedProfile: resolvedProfile.id,
           isSending: true,
           errorBanner: null,
+          errorCode: null,
           activeMaterialContext: null,
           lastFailedRequest: null,
         },
@@ -453,6 +476,7 @@ export function useTutorChat({
     input: state.input,
     isSending: state.isSending,
     errorBanner: state.errorBanner,
+    errorCode: state.errorCode,
     activeMaterialContext: state.activeMaterialContext,
     activeConversationId: state.activeConversationId,
     learningPhase: state.learningPhase,

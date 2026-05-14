@@ -8,6 +8,9 @@ export interface ChatProvider {
   implemented: boolean;
   default_model: string;
   models: string[];
+  source?: 'user' | 'global' | 'local' | 'none';
+  configured?: boolean;
+  credential_updated_at?: string | null;
   reason?: string | null;
 }
 
@@ -92,6 +95,8 @@ export interface TutorChatResponse {
   material_context?: MaterialContext;
   usage?: Record<string, number | null>;
   latency_ms?: number;
+  credential_source?: 'user' | 'global' | 'local';
+  credential_fingerprint?: string | null;
 }
 
 export interface TutorConversationSummary {

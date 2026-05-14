@@ -10,7 +10,7 @@ class Student(Base):
     __tablename__ = "students"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String(100), unique=True, nullable=False, index=True)  # 用户ID（外部系统）
+    user_id = Column(String(100), ForeignKey("users.username", ondelete="CASCADE"), unique=True, nullable=False, index=True)
     username = Column(String(100), nullable=True)
     
     # 统计信息

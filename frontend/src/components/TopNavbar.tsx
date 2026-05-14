@@ -1,8 +1,12 @@
-import { Brain, Languages, Moon, Sun } from 'lucide-react';
+import { Brain, KeyRound, Languages, LogOut, Moon, Sun } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../auth/AuthContext';
 import { useSettings } from '../utils/settings';
 
 export function TopNavbar() {
+  const { user, logout } = useAuth();
   const { language, toggleLanguage, theme, toggleTheme, tokens, t } = useSettings();
+  const navigate = useNavigate();
 
   const navStyle = {
     background: tokens.surfaceMuted,
@@ -61,17 +65,36 @@ export function TopNavbar() {
                 className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold"
                 style={{ background: tokens.surface, color: tokens.textPrimary }}
               >
-                {language === 'zh' ? '学' : 'S'}
+                {(user?.username ?? 'S').slice(0, 1).toUpperCase()}
               </div>
               <div className="text-right">
                 <p className="text-sm font-medium" style={{ color: tokens.textPrimary }}>
-                  {t('学习者', 'Student')}
+                  {user?.username ?? t('学习者', 'Student')}
                 </p>
                 <p className="text-xs" style={{ color: tokens.textSecondary }}>
-                  student@example.com
+                  {user?.email ?? t('已登录', 'Signed in')}
                 </p>
               </div>
             </div>
+
+            <button
+              onClick={() => navigate('/settings/model')}
+              className="flex h-10 w-10 items-center justify-center rounded-xl transition-colors"
+              style={chipStyle}
+              aria-label="model settings"
+              title={t('模型配置', 'Model settings')}
+            >
+              <KeyRound className="h-4 w-4" />
+            </button>
+
+            <button
+              onClick={() => void logout()}
+              className="flex h-10 w-10 items-center justify-center rounded-xl transition-colors"
+              style={chipStyle}
+              aria-label="logout"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </div>

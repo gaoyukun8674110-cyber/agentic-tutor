@@ -6,7 +6,6 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.models.chat_history import TutorConversation, TutorConversationDigest, TutorConversationMessage
 
 
@@ -341,8 +340,6 @@ class ChatHistoryService:
 
     @staticmethod
     def _user_scope_filter(user_id: str):
-        if user_id == settings.DEFAULT_AUTH_USER_ID:
-            return or_(TutorConversation.user_id == user_id, TutorConversation.user_id.is_(None))
         return TutorConversation.user_id == user_id
 
     def _conversation_summary(self, conversation: TutorConversation) -> Dict[str, Any]:

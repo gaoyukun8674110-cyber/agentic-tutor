@@ -27,23 +27,24 @@ class ChatHistoryServiceTests(unittest.TestCase):
                 provider="linkapi",
                 model="claude-haiku",
                 training_mode="focus",
+                user_id="learner-1",
             )
 
             self.assertEqual(summary["message_count"], 2)
             self.assertEqual(summary["title"], "Linear Equations")
 
-            conversations = service.list_conversations()
+            conversations = service.list_conversations(user_id="learner-1")
             self.assertEqual(len(conversations), 1)
             self.assertEqual(conversations[0]["id"], summary["id"])
 
-            detail = service.get_conversation(summary["id"])
+            detail = service.get_conversation(summary["id"], user_id="learner-1")
             self.assertIsNotNone(detail)
             self.assertEqual(len(detail["messages"]), 2)
             self.assertEqual(detail["messages"][0]["role"], "user")
             self.assertEqual(detail["messages"][1]["role"], "assistant")
 
-            self.assertTrue(service.delete_conversation(summary["id"]))
-            self.assertEqual(service.list_conversations(), [])
+            self.assertTrue(service.delete_conversation(summary["id"], user_id="learner-1"))
+            self.assertEqual(service.list_conversations(user_id="learner-1"), [])
         finally:
             db.close()
 
@@ -60,6 +61,7 @@ class ChatHistoryServiceTests(unittest.TestCase):
                 provider="linkapi",
                 model="claude-haiku",
                 training_mode="focus",
+                user_id="learner-1",
             )
             equation_summary = service.save_exchange(
                 conversation_id=None,
@@ -69,6 +71,7 @@ class ChatHistoryServiceTests(unittest.TestCase):
                 provider="linkapi",
                 model="claude-haiku",
                 training_mode="focus",
+                user_id="learner-1",
             )
 
             self.assertEqual(stats_summary["title"], "统计教材学习")
@@ -125,6 +128,7 @@ class ChatHistoryServiceTests(unittest.TestCase):
                     provider="linkapi",
                     model="claude-haiku",
                     training_mode="focus",
+                    user_id="learner-1",
                 )
                 conversation_id = summary["id"]
 
@@ -132,11 +136,13 @@ class ChatHistoryServiceTests(unittest.TestCase):
                 conversation_id=conversation_id,
                 content="student is learning equations and needs guided hints",
                 source_message_count=30,
+                user_id="learner-1",
             )
 
             compact_messages = service.build_model_messages(
                 conversation_id=conversation_id,
                 pending_user_message="new question after summary",
+                user_id="learner-1",
             )
 
             self.assertIsNotNone(compact_messages)
@@ -187,19 +193,19 @@ class ChatHistoryServiceTests(unittest.TestCase):
         finally:
             db.close()
 
-    def test_default_user_can_read_legacy_userless_conversations(self):
+    def test_user_scope_excludes_other_users_conversations(self):
         db = self.SessionLocal()
         try:
             service = ChatHistoryService(db)
-            legacy = service.save_exchange(
+            alice = service.save_exchange(
                 conversation_id=None,
-                user_message="legacy statistics conversation",
-                assistant_message="saved before API key user scoping existed",
+                user_message="alice statistics conversation",
+                assistant_message="scoped to alice",
                 prompt_profile="three_stage",
                 provider="linkapi",
                 model="claude-haiku",
                 training_mode="focus",
-                user_id=None,
+                user_id="alice",
             )
             other = service.save_exchange(
                 conversation_id=None,
@@ -212,14 +218,14 @@ class ChatHistoryServiceTests(unittest.TestCase):
                 user_id="learner-1",
             )
 
-            local_results = service.list_conversations(user_id="local")
+            alice_results = service.list_conversations(user_id="alice")
             learner_results = service.list_conversations(user_id="learner-1")
 
-            self.assertIn(legacy["id"], [item["id"] for item in local_results])
-            self.assertNotIn(other["id"], [item["id"] for item in local_results])
+            self.assertEqual([item["id"] for item in alice_results], [alice["id"]])
+            self.assertNotIn(other["id"], [item["id"] for item in alice_results])
             self.assertEqual([item["id"] for item in learner_results], [other["id"]])
-            self.assertIsNotNone(service.get_conversation(legacy["id"], user_id="local"))
-            self.assertIsNone(service.get_conversation(legacy["id"], user_id="learner-1"))
+            self.assertIsNotNone(service.get_conversation(alice["id"], user_id="alice"))
+            self.assertIsNone(service.get_conversation(alice["id"], user_id="learner-1"))
         finally:
             db.close()
 

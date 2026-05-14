@@ -10,7 +10,7 @@ class StudyMaterial(Base):
     __tablename__ = "study_materials"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String(100), nullable=True, index=True)
+    user_id = Column(String(100), ForeignKey("users.username", ondelete="CASCADE"), nullable=False, index=True)
     filename = Column(String(255), nullable=False)
     file_type = Column(String(20), nullable=False, index=True)
     content_type = Column(String(120), nullable=True)

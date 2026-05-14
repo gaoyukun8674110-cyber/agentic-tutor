@@ -15,6 +15,7 @@ import { useTutorTimer } from './tutor/useTutorTimer';
 interface TutorChatWorkspaceProps {
   trainingMode: string;
   onExit: () => void;
+  onConfigureModel?: () => void;
   onPomodoroLogged?: () => void;
 }
 
@@ -45,7 +46,7 @@ function getFocusToneStyle(tokens: ThemeTokens, tone: FocusTone) {
   }[tone];
 }
 
-export function TutorChatWorkspace({ trainingMode, onExit, onPomodoroLogged }: TutorChatWorkspaceProps) {
+export function TutorChatWorkspace({ trainingMode, onExit, onConfigureModel, onPomodoroLogged }: TutorChatWorkspaceProps) {
   const { language, textStyle, tokens, t } = useSettings();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isPinnedToBottom, setIsPinnedToBottom] = useState(true);
@@ -332,6 +333,14 @@ export function TutorChatWorkspace({ trainingMode, onExit, onPomodoroLogged }: T
                     className="rounded-md px-2 py-0.5 text-xs font-medium hover:bg-[var(--ai-hover-surface)]"
                   >
                     {t('重试', 'Retry')}
+                  </button>
+                )}
+                {chat.errorCode === 'llm_provider_not_configured' && onConfigureModel && (
+                  <button
+                    onClick={onConfigureModel}
+                    className="rounded-md px-2 py-0.5 text-xs font-medium hover:bg-[var(--ai-hover-surface)]"
+                  >
+                    {t('配置模型', 'Configure model')}
                   </button>
                 )}
               </div>

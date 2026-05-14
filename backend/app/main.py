@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.bootstrap import initialize_database, should_auto_create_schema
 from app.config import settings
 from app.database import engine, Base
-from app.api import questions, training, student, llm, analytics, dashboard, materials
+from app.api import analytics, auth, dashboard, llm, materials, questions, student, training
 from app.services.llm_service import LLMService
 from app.utils.errors import http_exception_handler, unhandled_exception_handler
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -21,7 +21,7 @@ app = FastAPI(
 
 def build_cors_options(debug: bool, origins: list[str]) -> tuple[list[str], bool]:
     if debug:
-        return ["*"], False
+        return origins, True
     return origins, True
 
 
@@ -68,6 +68,7 @@ async def security_headers(request: Request, call_next):
     return response
 
 # 注册路由
+app.include_router(auth.router)
 app.include_router(questions.router)
 app.include_router(training.router)
 app.include_router(student.router)

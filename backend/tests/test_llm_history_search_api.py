@@ -6,11 +6,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.api.deps import get_current_user
 from app.api.llm import router as llm_router
 from app.database import Base, get_db
+from app.models.user import User
 from app.services.chat_history import ChatHistoryService
-
-AUTH_HEADERS = {"X-API-Key": "local-dev-key"}
 
 
 class LlmHistorySearchApiTests(unittest.TestCase):
@@ -33,6 +33,14 @@ class LlmHistorySearchApiTests(unittest.TestCase):
                 pass
 
         app.dependency_overrides[get_db] = override_db
+        app.dependency_overrides[get_current_user] = lambda: User(
+            id=1,
+            username="alice",
+            email=None,
+            is_active=True,
+            created_at="now",
+            updated_at="now",
+        )
         app.include_router(llm_router)
         self.client = TestClient(app)
 
@@ -49,13 +57,12 @@ class LlmHistorySearchApiTests(unittest.TestCase):
             provider="linkapi",
             model="claude-haiku",
             training_mode="focus",
-            user_id="local",
+            user_id="alice",
         )
 
         response = self.client.get(
             "/api/llm/conversations/search",
-            params={"query": "posterior", "user_id": "learner-1"},
-            headers=AUTH_HEADERS,
+            params={"query": "posterior", "user_id": "bob"},
         )
 
         self.assertEqual(response.status_code, 200)
@@ -63,24 +70,24 @@ class LlmHistorySearchApiTests(unittest.TestCase):
         self.assertEqual(len(conversations), 1)
         self.assertEqual(conversations[0]["id"], created["id"])
 
-    def test_conversations_endpoint_returns_legacy_userless_history_for_local_user(self):
+    def test_conversations_endpoint_hides_other_users_history(self):
         service = ChatHistoryService(self.db)
         created = service.save_exchange(
             conversation_id=None,
-            user_message="legacy statistics conversation",
-            assistant_message="saved before X-API-Key user scoping existed",
+            user_message="bob statistics conversation",
+            assistant_message="scoped to bob",
             prompt_profile="three_stage",
             provider="linkapi",
             model="claude-haiku",
             training_mode="focus",
-            user_id=None,
+            user_id="bob",
         )
 
-        response = self.client.get("/api/llm/conversations", headers=AUTH_HEADERS)
+        response = self.client.get("/api/llm/conversations")
 
         self.assertEqual(response.status_code, 200)
         conversations = response.json()["conversations"]
-        self.assertIn(created["id"], [item["id"] for item in conversations])
+        self.assertNotIn(created["id"], [item["id"] for item in conversations])
 
     def test_export_conversation_endpoint_returns_markdown(self):
         service = ChatHistoryService(self.db)
@@ -92,13 +99,12 @@ class LlmHistorySearchApiTests(unittest.TestCase):
             provider="linkapi",
             model="claude-haiku",
             training_mode="focus",
-            user_id="local",
+            user_id="alice",
         )
 
         response = self.client.get(
             f"/api/llm/conversations/{created['id']}/export",
-            params={"user_id": "learner-1"},
-            headers=AUTH_HEADERS,
+            params={"user_id": "bob"},
         )
 
         self.assertEqual(response.status_code, 200)

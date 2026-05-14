@@ -21,7 +21,6 @@ interface TodayPlanProps {
   onStatsChange?: (stats: TodayPlanStats) => void;
   onDataChange?: () => void;
   tasks?: DashboardTask[];
-  userId?: string;
 }
 
 const priorityStyles: Record<Priority, { label: string }> = {
@@ -30,7 +29,7 @@ const priorityStyles: Record<Priority, { label: string }> = {
   low: { label: 'Low' },
 };
 
-export function TodayPlan({ onStatsChange, onDataChange, tasks = [], userId = 'local' }: TodayPlanProps) {
+export function TodayPlan({ onStatsChange, onDataChange, tasks = [] }: TodayPlanProps) {
   const [subject, setSubject] = useState('');
   const [taskText, setTaskText] = useState('');
   const [duration, setDuration] = useState(25);
@@ -72,7 +71,6 @@ export function TodayPlan({ onStatsChange, onDataChange, tasks = [], userId = 'l
     }) => {
       if (task.id) {
         return updateDashboardTask(task.id, {
-          user_id: userId,
           subject: task.subject,
           task: task.task,
           duration: task.duration,
@@ -81,7 +79,6 @@ export function TodayPlan({ onStatsChange, onDataChange, tasks = [], userId = 'l
       }
 
       return createDashboardTask({
-        user_id: userId,
         subject: task.subject,
         task: task.task,
         duration: task.duration,
@@ -93,32 +90,31 @@ export function TodayPlan({ onStatsChange, onDataChange, tasks = [], userId = 'l
       onDataChange?.();
     },
     onError: (error) => {
-      toastError(error, t('Unable to save task', 'Unable to save task'));
+      toastError(error, t('无法保存任务', 'Unable to save task'));
     },
   });
 
   const toggleTaskMutation = useMutation({
     mutationFn: async (task: DashboardTask) =>
       updateDashboardTask(task.id, {
-        user_id: userId,
         completed: !task.completed,
       }),
     onSuccess: () => {
       onDataChange?.();
     },
     onError: (error) => {
-      toastError(error, t('Unable to update task', 'Unable to update task'));
+      toastError(error, t('无法更新任务', 'Unable to update task'));
     },
   });
 
   const deleteTaskMutation = useMutation({
-    mutationFn: async (task: DashboardTask) => deleteDashboardTask(task.id, userId),
+    mutationFn: async (task: DashboardTask) => deleteDashboardTask(task.id),
     onSuccess: (_deleted, task) => {
       if (editingId === task.id) resetForm();
       onDataChange?.();
     },
     onError: (error) => {
-      toastError(error, t('Unable to delete task', 'Unable to delete task'));
+      toastError(error, t('无法删除任务', 'Unable to delete task'));
     },
   });
 
@@ -227,8 +223,8 @@ export function TodayPlan({ onStatsChange, onDataChange, tasks = [], userId = 'l
             <button
               onClick={saveTask}
               disabled={!taskText.trim() || saveTaskMutation.isPending}
-              className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl px-4 text-white disabled:cursor-not-allowed disabled:opacity-50"
-              style={{ background: tokens.accentSecondary }}
+              className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl px-4 disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ background: tokens.accentSecondary, color: tokens.textInverted }}
             >
               {editingId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
               {editingId ? t('保存', 'Save') : t('添加', 'Add')}
@@ -259,15 +255,15 @@ export function TodayPlan({ onStatsChange, onDataChange, tasks = [], userId = 'l
                     disabled={toggleTaskMutation.isPending}
                   >
                     {task.completed ? (
-                      <CheckCircle2 className="h-6 w-6 text-green-600" />
+                      <CheckCircle2 className="h-6 w-6" style={{ color: tokens.success }} />
                     ) : (
-                      <Circle className="h-6 w-6 text-gray-400 transition-colors group-hover:text-orange-500" />
+                      <Circle className="h-6 w-6 transition-colors" style={{ color: tokens.textMuted }} />
                     )}
                   </button>
 
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className={task.completed ? 'line-through text-green-600' : ''} style={{ color: task.completed ? undefined : tokens.textPrimary }}>
+                      <span className={task.completed ? 'line-through' : ''} style={{ color: task.completed ? tokens.success : tokens.textPrimary }}>
                         {task.subject}
                       </span>
                       <span className="rounded-lg px-2 py-1 text-xs font-medium" style={{ background: tokens.surface, border: tokens.borderSoft, color: priorityColors[task.priority] }}>
@@ -284,7 +280,7 @@ export function TodayPlan({ onStatsChange, onDataChange, tasks = [], userId = 'l
                       {task.task}
                     </p>
                     <div className="mt-2 flex items-center gap-1 text-xs" style={{ color: tokens.textSecondary }}>
-                      <Clock className="h-3 w-3 text-blue-500" />
+                      <Clock className="h-3 w-3" style={{ color: tokens.accentPrimary }} />
                       {task.duration}
                       {t('分钟', ' min')}
                     </div>
@@ -305,7 +301,7 @@ export function TodayPlan({ onStatsChange, onDataChange, tasks = [], userId = 'l
                       style={panelStyle}
                       disabled={deleteTaskMutation.isPending}
                     >
-                      <Trash2 className="h-4 w-4 text-red-500" />
+                      <Trash2 className="h-4 w-4" style={{ color: tokens.danger }} />
                     </button>
                   </div>
                 </div>
@@ -316,14 +312,14 @@ export function TodayPlan({ onStatsChange, onDataChange, tasks = [], userId = 'l
 
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div className="rounded-2xl p-4" style={panelStyle}>
-            <div className="text-green-600">{t('已完成', 'Done')}</div>
+            <div style={{ color: tokens.success }}>{t('已完成', 'Done')}</div>
             <div className="mt-1 text-2xl font-semibold tabular-nums" style={{ color: tokens.textPrimary }}>
               {stats.completedMinutes}
               {t('分钟', ' min')}
             </div>
           </div>
           <div className="rounded-2xl p-4" style={panelStyle}>
-            <div className="text-blue-600">{t('计划总计', 'Planned')}</div>
+            <div style={{ color: tokens.accentPrimary }}>{t('计划总计', 'Planned')}</div>
             <div className="mt-1 text-2xl font-semibold tabular-nums" style={{ color: tokens.textPrimary }}>
               {stats.totalMinutes}
               {t('分钟', ' min')}

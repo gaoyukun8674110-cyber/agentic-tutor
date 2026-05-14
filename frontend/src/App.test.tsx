@@ -29,6 +29,14 @@ vi.mock('./components/TutorChatWorkspace', () => ({
   TutorChatWorkspace: () => <div>tutor-workspace</div>,
 }));
 
+vi.mock('./auth/AuthContext', () => ({
+  useAuth: () => ({
+    user: { id: 1, username: 'alice', email: null, created_at: 'now' },
+    isBootstrapping: false,
+    logout: vi.fn(),
+  }),
+}));
+
 vi.mock('./utils/dashboardApi', () => ({
   fetchDashboardSummary: vi.fn().mockResolvedValue({
     today: {

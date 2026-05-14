@@ -8,4 +8,6 @@ export interface ChatMessage {
   role: ChatRole;
   content: string;
   label?: string;
+  credentialSource?: 'user' | 'global' | 'local';
+  credentialFingerprint?: string | null;
 }

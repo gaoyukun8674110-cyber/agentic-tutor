@@ -1,8 +1,8 @@
 import { toast } from 'sonner';
 
-import { getUserFacingError, isAbortError } from './apiClient';
+import { getDefaultErrorMessage, getUserFacingError, isAbortError } from './apiClient';
 
-export function toastError(error: unknown, fallbackMessage = 'Unexpected error') {
+export function toastError(error: unknown, fallbackMessage = getDefaultErrorMessage()) {
   if (isAbortError(error)) return;
 
   const message =

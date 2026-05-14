@@ -4,7 +4,6 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models.chat_history import TutorConversation
@@ -252,7 +251,7 @@ class DashboardService:
         ).all():
             dates.add(session.completed_at[:10])
         for conversation in self.db.query(TutorConversation).filter(
-            or_(TutorConversation.user_id == user_id, TutorConversation.user_id.is_(None))
+            TutorConversation.user_id == user_id
         ).all():
             dates.add(conversation.updated_at[:10])
         return dates
@@ -288,7 +287,7 @@ class DashboardService:
         conversations = (
             self.db.query(TutorConversation)
             .filter(
-                or_(TutorConversation.user_id == user_id, TutorConversation.user_id.is_(None)),
+                TutorConversation.user_id == user_id,
                 TutorConversation.updated_at >= start,
                 TutorConversation.updated_at < end,
             )

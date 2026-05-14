@@ -44,9 +44,13 @@ uvicorn app.main:app --reload
 
 ## Architecture / Decision Records
 
+- Authentication now uses `/api/auth/register`, `/api/auth/login`, `/api/auth/refresh`, `/api/auth/logout`, and `/api/auth/me`.
+- Protected browser calls use `Authorization: Bearer <access_token>` and an HttpOnly refresh cookie scoped to `/api/auth`; the old shared `X-API-Key` application auth path is removed.
+- Run `python -m alembic upgrade head` before local demo or deployment startup. The migrations seed `test-01 / 123456`, backfill legacy unowned Tutor data to that user, and verify no null-owned legacy rows remain.
 - Frontend project now lives at `../frontend` inside the `H:\ai-tutor` monorepo; backend and frontend changes that depend on the API contract should be versioned together.
 - SQLite is used for the portfolio/demo profile because local setup is deterministic; SQLAlchemy keeps a PostgreSQL migration path open.
 - LLM calls are backend-proxied so API keys never ship to the browser and multiple OpenAI-compatible providers can be routed behind one API.
+- Users can save personal OpenAI-compatible provider credentials at `/settings/model`; `/api/llm/chat`, `/hint`, `/explain`, `/diagnose`, and `/summary` resolve user credentials before optional global fallback and return `credential_source`.
 - RAG v1 stores source files, chunks text, and uses OpenAI embeddings when configured; hash embeddings are explicitly surfaced as `embedding_mode="hash"` for offline development and tests.
 - Upload ingestion creates a `pending` material first and fills embeddings in a background task to avoid holding the HTTP response open for long PDFs.
 
@@ -57,6 +61,20 @@ uvicorn app.main:app --reload
 ```bash
 python scripts/evaluate_tutor_behavior.py --json
 ```
+
+## 用户级 LLM Key 配置
+
+Personal provider API keys are encrypted in `user_llm_credentials`; plaintext keys are accepted only on `PUT /api/llm/credentials/{provider_id}` and are never returned by API responses.
+
+Required deployment settings:
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Set the generated value as `LLM_CREDENTIAL_ENCRYPTION_KEY`. For key rotation, deploy the new key as `LLM_CREDENTIAL_ENCRYPTION_KEY` and move the previous active key into comma-separated `LLM_CREDENTIAL_PREVIOUS_KEYS`; old credentials remain decryptable while new writes use the new key. Set `LLM_FINGERPRINT_HMAC_KEY` to a separate random secret when possible; otherwise the app derives an HMAC secret from the encryption key.
+
+`ALLOW_GLOBAL_LLM_FALLBACK=True` keeps backend `.env` provider keys available for demo/admin fallback. Set it to `False` when users must bring their own keys.
 
 Seed cases 位于 `evals/tutor_cases.jsonl`，覆盖：
 

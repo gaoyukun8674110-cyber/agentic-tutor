@@ -116,7 +116,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
       setLastEvent({ ...result.event, id: eventId });
 
       if (result.event.focusLogMinutes > 0) {
-        void logDashboardPomodoro(result.event.focusLogMinutes, 'work', 'local')
+        void logDashboardPomodoro(result.event.focusLogMinutes, 'work')
           .then(() => setLogVersion((version) => version + 1))
           .catch(() => {
             // Keep the shared timer usable even when persistence is temporarily unavailable.

@@ -1,11 +1,24 @@
 """LLM 相关 API"""
-from fastapi import APIRouter, Depends, HTTPException, Request
+import time
+from collections import deque
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List, Dict, Any
 from app.api.deps import get_current_user
 from app.config import settings
 from app.database import get_db
+from app.models.user import User
+from app.services.llm_credential_resolver import LLMCredentialResolver, ResolvedProvider
+from app.services.llm_credential_service import (
+    CredentialAADMismatch,
+    CredentialCorrupted,
+    CredentialEncryptionUnavailable,
+    InvalidProviderBaseURL,
+    LLMCredentialService,
+    validate_provider_base_url,
+)
+from app.services.llm_provider_registry import global_provider_credentials, provider_registry
 from app.services.llm_service import LLMService
 from app.services.analytics import AnalyticsService
 from app.services.chat_history import ChatHistoryService
@@ -13,6 +26,7 @@ from app.services.materials import MaterialService
 from app.utils.errors import api_error, safe_llm_error
 
 router = APIRouter(prefix="/api/llm", tags=["llm"], dependencies=[Depends(get_current_user)])
+_credential_test_windows: dict[tuple[int, str], deque[float]] = {}
 
 
 class ChatMessage(BaseModel):
@@ -53,12 +67,107 @@ class SummaryRequest(BaseModel):
     session_stats: dict
 
 
+class UserLLMCredentialPutIn(BaseModel):
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    default_model: Optional[str] = None
+    is_default: bool = False
+    is_enabled: bool = True
+
+
+class UserLLMCredentialPatchIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    base_url: Optional[str] = None
+    default_model: Optional[str] = None
+    is_default: Optional[bool] = None
+    is_enabled: Optional[bool] = None
+
+
 def get_llm_service(request: Request) -> LLMService:
     llm_service = getattr(request.app.state, "llm_service", None)
     if llm_service is None:
         llm_service = LLMService()
         request.app.state.llm_service = llm_service
     return llm_service
+
+
+def _validate_provider_for_write(provider_id: str) -> None:
+    provider = provider_registry().get(provider_id)
+    if not provider or not provider.implemented or provider.adapter != "openai-compatible":
+        raise api_error(status.HTTP_400_BAD_REQUEST, "unsupported_provider", "Unsupported provider")
+
+
+def _resolve_provider_or_raise(db: Session, user: User, provider: str | None = "auto") -> ResolvedProvider:
+    try:
+        return LLMCredentialResolver(db).resolve(user, provider or "auto")
+    except ValueError as error:
+        code = str(error)
+        if code == "unsupported_provider":
+            raise api_error(status.HTTP_400_BAD_REQUEST, "unsupported_provider", "Unsupported provider") from error
+        if code == "llm_provider_not_configured":
+            raise api_error(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "llm_provider_not_configured",
+                "Model provider is not configured",
+            ) from error
+        raise
+    except (CredentialAADMismatch, CredentialCorrupted) as error:
+        raise api_error(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "llm_credentials_corrupted",
+            "Stored model credential is invalid",
+        ) from error
+
+
+def _enforce_test_rate_limit(user_id: int, provider_id: str) -> None:
+    now = time.time()
+    key = (user_id, provider_id)
+    window = _credential_test_windows.setdefault(key, deque())
+    while window and now - window[0] > 60:
+        window.popleft()
+    if len(window) >= 5:
+        raise api_error(status.HTTP_429_TOO_MANY_REQUESTS, "rate_limited", "Too many requests")
+    window.append(now)
+
+
+def _safe_provider_metadata_for_user(db: Session, user: User) -> dict[str, Any]:
+    credential_service = LLMCredentialService(db)
+    credentials = {
+        credential.provider_id: credential
+        for credential in credential_service.get_user_credentials(user)
+    }
+    providers = []
+    for provider_id, definition in provider_registry().items():
+        credential = credentials.get(provider_id)
+        global_credentials = global_provider_credentials(provider_id)
+        has_global = bool(global_credentials["base_url"]) and (
+            not definition.requires_api_key or bool(global_credentials["api_key"])
+        )
+        has_user = bool(credential and credential.is_enabled and (credential.encrypted_api_key or not definition.requires_api_key))
+        source = "user" if has_user else ("local" if provider_id == "ollama" else ("global" if has_global else "none"))
+        enabled = definition.implemented and (has_user or has_global or (provider_id == "ollama" and bool(definition.base_url)))
+        reason = None
+        if not definition.implemented:
+            reason = "provider adapter is not implemented yet"
+        elif not enabled:
+            reason = "provider credentials are not configured"
+        providers.append(
+            {
+                "id": provider_id,
+                "name": definition.name,
+                "adapter": definition.adapter,
+                "enabled": enabled,
+                "implemented": definition.implemented,
+                "default_model": credential.default_model if credential and credential.default_model else definition.default_model,
+                "models": definition.models,
+                "reason": reason,
+                "source": source,
+                "configured": bool(credential),
+                "credential_updated_at": credential.updated_at if credential else None,
+            }
+        )
+    return {"providers": providers}
 
 
 def _last_user_message(messages: List[ChatMessage]) -> Optional[str]:
@@ -168,6 +277,7 @@ def _finalize_conversation_response(
     request: ChatRequest,
     history: ChatHistoryService,
     llm: LLMService,
+    resolved: ResolvedProvider,
     tutor_context: Dict[str, Any],
     last_user_message: Optional[str],
     user_id: str,
@@ -201,6 +311,7 @@ def _finalize_conversation_response(
             summary_request = request.model_copy(update={"tutor_context": tutor_context})
             summary = _generate_conversation_summary(
                 llm=llm,
+                resolved=resolved,
                 request=summary_request,
                 conversation=detail,
                 fallback_summary=fallback_summary,
@@ -230,6 +341,7 @@ def _finalize_conversation_response(
 
 def _generate_conversation_summary(
     llm: LLMService,
+    resolved: ResolvedProvider,
     request: ChatRequest,
     conversation: Dict[str, Any],
     fallback_summary: str,
@@ -252,35 +364,156 @@ def _generate_conversation_summary(
         f"Conversation transcript:\n{transcript}"
     )
 
-    result = llm.chat(
-        provider=request.provider,
-        model=request.model,
+    result = llm.complete_chat(
+        resolved=resolved,
         messages=[{"role": "user", "content": summary_prompt}],
         prompt_profile="custom",
         system_prompt_override="You summarize AI Tutor sessions. Output only reusable learning-state summary text.",
         tutor_context={"task": "conversation_summary", "learning_phase": learning_phase},
+        agent_type=f"conversation_summary:{resolved.provider_id}",
         user_id=user_id,
         session_id=session_id,
         analytics=analytics,
+        model=request.model,
     )
     if "error" in result:
         return fallback_summary
     return result.get("message", {}).get("content") or fallback_summary
 
 
+@router.get("/credentials", response_model=dict)
+def list_credentials(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    credential_service = LLMCredentialService(db)
+    return {
+        "credentials": [
+            credential_service.to_safe_metadata(credential)
+            for credential in credential_service.get_user_credentials(current_user)
+        ]
+    }
+
+
+@router.put("/credentials/{provider_id}", response_model=dict)
+def put_credential(
+    provider_id: str,
+    payload: UserLLMCredentialPutIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _validate_provider_for_write(provider_id)
+    provider = provider_registry()[provider_id]
+    if provider.requires_api_key and not (payload.api_key and len(payload.api_key.strip()) >= 8):
+        raise api_error(status.HTTP_422_UNPROCESSABLE_ENTITY, "api_key_required", "API key is required")
+    try:
+        base_url = validate_provider_base_url(payload.base_url)
+        credential = LLMCredentialService(db).put_credential(
+            user=current_user,
+            provider_id=provider_id,
+            api_key=payload.api_key,
+            base_url=base_url,
+            default_model=payload.default_model,
+            is_default=payload.is_default,
+            is_enabled=payload.is_enabled,
+        )
+    except InvalidProviderBaseURL as error:
+        raise api_error(status.HTTP_400_BAD_REQUEST, "invalid_provider_base_url", "Invalid provider base URL") from error
+    except CredentialEncryptionUnavailable as error:
+        raise api_error(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "llm_credentials_encryption_unavailable",
+            "Credential encryption is not configured",
+        ) from error
+    return {"credential": LLMCredentialService(db).to_safe_metadata(credential)}
+
+
+@router.patch("/credentials/{provider_id}", response_model=dict)
+def patch_credential(
+    provider_id: str,
+    payload: Dict[str, Any],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _validate_provider_for_write(provider_id)
+    if "api_key" in payload:
+        raise api_error(status.HTTP_422_UNPROCESSABLE_ENTITY, "api_key_must_use_put", "API key updates must use PUT")
+    patch = UserLLMCredentialPatchIn.model_validate(payload)
+    try:
+        base_url = validate_provider_base_url(patch.base_url) if patch.base_url is not None else None
+        credential = LLMCredentialService(db).patch_credential(
+            user=current_user,
+            provider_id=provider_id,
+            base_url=base_url,
+            default_model=patch.default_model,
+            is_default=patch.is_default,
+            is_enabled=patch.is_enabled,
+        )
+    except KeyError as error:
+        raise api_error(status.HTTP_404_NOT_FOUND, "not_found", "Credential not found") from error
+    except InvalidProviderBaseURL as error:
+        raise api_error(status.HTTP_400_BAD_REQUEST, "invalid_provider_base_url", "Invalid provider base URL") from error
+    return {"credential": LLMCredentialService(db).to_safe_metadata(credential)}
+
+
+@router.delete("/credentials/{provider_id}", response_model=dict)
+def delete_credential(
+    provider_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _validate_provider_for_write(provider_id)
+    deleted = LLMCredentialService(db).delete_credential(user=current_user, provider_id=provider_id)
+    return {"deleted": deleted}
+
+
+@router.post("/credentials/{provider_id}/test", response_model=dict)
+def test_credential(
+    provider_id: str,
+    db: Session = Depends(get_db),
+    llm: LLMService = Depends(get_llm_service),
+    current_user: User = Depends(get_current_user),
+):
+    _validate_provider_for_write(provider_id)
+    _enforce_test_rate_limit(current_user.id, provider_id)
+    resolved = _resolve_provider_or_raise(db, current_user, provider_id)
+    result = llm.complete_chat(
+        resolved=resolved,
+        messages=[{"role": "user", "content": "Reply with OK only."}],
+        prompt_profile="custom",
+        system_prompt_override="You are a connectivity test. Reply with OK only.",
+        agent_type=f"credential_test:{provider_id}",
+        user_id=current_user.username,
+        session_id=None,
+        analytics=None,
+        max_tokens=8,
+        temperature=0,
+    )
+    if "error" in result:
+        raise api_error(
+            status.HTTP_502_BAD_GATEWAY,
+            "llm_provider_validation_failed",
+            "Model provider is temporarily unavailable",
+        )
+    if resolved.source == "user":
+        LLMCredentialService(db).record_used(resolved.credential_id)
+    return {"ok": True, "credential_source": result.get("credential_source")}
+
+
 @router.get("/providers", response_model=dict)
 def provider_metadata(
+    db: Session = Depends(get_db),
     llm: LLMService = Depends(get_llm_service),
-    current_user: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """获取可用模型 Provider 元数据，不返回任何 API Key"""
-    return llm.get_provider_metadata()
+    return _safe_provider_metadata_for_user(db, current_user)
 
 
 @router.get("/prompt-profiles", response_model=dict)
 def prompt_profiles(
     llm: LLMService = Depends(get_llm_service),
-    current_user: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """获取可用 Tutor 系统提示词配置"""
     return llm.get_prompt_profiles()
@@ -288,13 +521,12 @@ def prompt_profiles(
 
 @router.get("/conversations", response_model=dict)
 def conversation_history(
-    user_id: Optional[str] = None,
     limit: int = 50,
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """List persisted Tutor conversations."""
-    user_id = current_user
+    user_id = current_user.username
     history = ChatHistoryService(db)
     return {"conversations": history.list_conversations(user_id=user_id, limit=limit)}
 
@@ -302,13 +534,12 @@ def conversation_history(
 @router.get("/conversations/search", response_model=dict)
 def search_conversation_history(
     query: str,
-    user_id: Optional[str] = None,
     limit: int = 20,
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Search persisted Tutor conversations by title, summary, and message text."""
-    user_id = current_user
+    user_id = current_user.username
     history = ChatHistoryService(db)
     return {"conversations": history.search_conversations(query=query, user_id=user_id, limit=limit)}
 
@@ -316,12 +547,11 @@ def search_conversation_history(
 @router.get("/conversations/{conversation_id}", response_model=dict)
 def conversation_detail(
     conversation_id: int,
-    user_id: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Load one persisted Tutor conversation with messages."""
-    user_id = current_user
+    user_id = current_user.username
     history = ChatHistoryService(db)
     conversation = history.get_conversation(conversation_id, user_id=user_id)
     if not conversation:
@@ -332,12 +562,11 @@ def conversation_detail(
 @router.get("/conversations/{conversation_id}/export", response_model=dict)
 def export_conversation(
     conversation_id: int,
-    user_id: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Export one Tutor conversation as Markdown content."""
-    user_id = current_user
+    user_id = current_user.username
     history = ChatHistoryService(db)
     exported = history.export_conversation_markdown(conversation_id, user_id=user_id)
     if not exported:
@@ -348,12 +577,11 @@ def export_conversation(
 @router.delete("/conversations/{conversation_id}", response_model=dict)
 def delete_conversation(
     conversation_id: int,
-    user_id: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Delete a persisted Tutor conversation."""
-    user_id = current_user
+    user_id = current_user.username
     history = ChatHistoryService(db)
     deleted = history.delete_conversation(conversation_id, user_id=user_id)
     if not deleted:
@@ -364,14 +592,13 @@ def delete_conversation(
 @router.post("/chat", response_model=dict)
 def tutor_chat(
     request: ChatRequest,
-    user_id: Optional[str] = None,
     session_id: Optional[int] = None,
     db: Session = Depends(get_db),
     llm: LLMService = Depends(get_llm_service),
-    current_user: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """统一 Tutor 对话入口，支持多 Provider 后端代理"""
-    user_id = current_user
+    user_id = current_user.username
     analytics = AnalyticsService(db)
     history = ChatHistoryService(db)
 
@@ -394,13 +621,15 @@ def tutor_chat(
         user_id=user_id,
     )
 
-    result = llm.chat(
-        provider=request.provider,
+    resolved = _resolve_provider_or_raise(db, current_user, request.provider)
+    result = llm.complete_chat(
+        resolved=resolved,
         model=request.model,
         messages=model_messages,
         prompt_profile=request.prompt_profile,
         system_prompt_override=request.system_prompt_override,
         tutor_context=tutor_context,
+        agent_type=f"tutor_chat:{request.prompt_profile}:{resolved.provider_id}",
         user_id=user_id,
         session_id=session_id,
         analytics=analytics,
@@ -409,12 +638,15 @@ def tutor_chat(
     if "error" in result:
         detail = result["error"] if isinstance(result["error"], dict) else safe_llm_error(result["error"])
         raise HTTPException(status_code=502, detail=detail)
+    if resolved.source == "user":
+        LLMCredentialService(db).record_used(resolved.credential_id)
 
     result = _finalize_conversation_response(
         result=result,
         request=request,
         history=history,
         llm=llm,
+        resolved=resolved,
         tutor_context=tutor_context,
         last_user_message=last_user_message,
         user_id=user_id,
@@ -433,110 +665,201 @@ def tutor_chat(
 @router.post("/hint", response_model=dict)
 def generate_hint(
     request: HintRequest,
-    user_id: Optional[str] = None,
     session_id: Optional[int] = None,
     db: Session = Depends(get_db),
     llm: LLMService = Depends(get_llm_service),
-    current_user: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """生成提示"""
-    user_id = current_user
+    user_id = current_user.username
     analytics = AnalyticsService(db)
-    
-    result = llm.generate_hint(
-        question_content=request.question_content,
-        student_answer=request.student_answer,
-        step=request.step,
+    prompt = f"""题目：{request.question_content}
+
+学生当前答案：{request.student_answer if request.student_answer else "尚未作答"}
+
+请给出第 {request.step} 步的提示（hint），不要直接给答案。提示应该：
+1. 引导学生思考下一步应该做什么
+2. 用提问的方式，而不是陈述
+3. 简短、精准，不超过 50 字"""
+    resolved = _resolve_provider_or_raise(db, current_user, "auto")
+    result = llm.complete_chat(
+        resolved=resolved,
+        messages=[{"role": "user", "content": prompt}],
+        prompt_profile="custom",
+        system_prompt_override=llm.agent_prompts["tutor"],
+        agent_type=f"tutor_hint:{resolved.provider_id}",
         user_id=user_id,
         session_id=session_id,
         analytics=analytics,
+        max_tokens=200,
+        temperature=0.7,
     )
     
     if "error" in result:
         raise api_error(502, "llm_provider_error", "Model provider is temporarily unavailable")
+    if resolved.source == "user":
+        LLMCredentialService(db).record_used(resolved.credential_id)
     
-    return result
+    return {
+        "hint": result.get("message", {}).get("content"),
+        "step": request.step,
+        "agent_type": "tutor",
+        "credential_source": result.get("credential_source"),
+        "credential_fingerprint": result.get("credential_fingerprint"),
+    }
 
 
 @router.post("/explain", response_model=dict)
 def explain_solution(
     request: ExplainRequest,
-    user_id: Optional[str] = None,
     session_id: Optional[int] = None,
     db: Session = Depends(get_db),
     llm: LLMService = Depends(get_llm_service),
-    current_user: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """讲解标准解"""
-    user_id = current_user
+    user_id = current_user.username
     analytics = AnalyticsService(db)
-    
-    result = llm.explain_solution(
-        question_content=request.question_content,
-        standard_solution=request.standard_solution,
-        solution_steps=request.solution_steps,
+    steps_text = ""
+    if request.solution_steps:
+        for index, step in enumerate(request.solution_steps, 1):
+            steps_text += f"\n步骤 {index}: {step.get('description', '') if isinstance(step, dict) else step}"
+    prompt = f"""题目：{request.question_content}
+
+标准答案：{request.standard_solution}
+解题步骤：{steps_text}
+
+请用通俗易懂的语言讲解这道题的解法，包括：
+1. 解题思路
+2. 关键步骤的解释
+3. 为什么这样做"""
+    resolved = _resolve_provider_or_raise(db, current_user, "auto")
+    result = llm.complete_chat(
+        resolved=resolved,
+        messages=[{"role": "user", "content": prompt}],
+        prompt_profile="custom",
+        system_prompt_override=llm.agent_prompts["tutor"],
+        agent_type=f"tutor_explain:{resolved.provider_id}",
         user_id=user_id,
         session_id=session_id,
         analytics=analytics,
+        max_tokens=500,
+        temperature=0.7,
     )
     
     if "error" in result:
         raise api_error(502, "llm_provider_error", "Model provider is temporarily unavailable")
+    if resolved.source == "user":
+        LLMCredentialService(db).record_used(resolved.credential_id)
     
-    return result
+    return {
+        "explanation": result.get("message", {}).get("content"),
+        "agent_type": "tutor",
+        "credential_source": result.get("credential_source"),
+        "credential_fingerprint": result.get("credential_fingerprint"),
+    }
 
 
 @router.post("/diagnose", response_model=dict)
 def diagnose_error(
     request: DiagnoseRequest,
-    user_id: Optional[str] = None,
     session_id: Optional[int] = None,
     db: Session = Depends(get_db),
     llm: LLMService = Depends(get_llm_service),
-    current_user: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """诊断错误"""
-    user_id = current_user
+    user_id = current_user.username
     analytics = AnalyticsService(db)
-    
-    result = llm.diagnose_error(
-        question_content=request.question_content,
-        student_answer=request.student_answer,
-        correct_answer=request.correct_answer,
-        standard_solution=request.standard_solution,
+    math_verification = llm.math_tools.verify_answer(request.student_answer, request.correct_answer)
+    prompt = f"""题目：{request.question_content}
+
+学生答案：{request.student_answer}
+正确答案：{request.correct_answer}
+标准解法：{request.standard_solution}
+
+数学工具验证结果：{math_verification.get('result', 'unknown')}
+
+请诊断学生的错误：
+1. 具体哪里错了
+2. 错误的原因（概念理解错误？计算错误？方法错误？）
+3. 正确的思路应该是什么
+4. 给出改进建议"""
+    resolved = _resolve_provider_or_raise(db, current_user, "auto")
+    result = llm.complete_chat(
+        resolved=resolved,
+        messages=[{"role": "user", "content": prompt}],
+        prompt_profile="custom",
+        system_prompt_override=llm.agent_prompts["diagnosis"],
+        agent_type=f"diagnosis:{resolved.provider_id}",
         user_id=user_id,
         session_id=session_id,
         analytics=analytics,
+        max_tokens=400,
+        temperature=0.5,
     )
     
     if "error" in result:
         raise api_error(502, "llm_provider_error", "Model provider is temporarily unavailable")
+    if resolved.source == "user":
+        LLMCredentialService(db).record_used(resolved.credential_id)
     
-    return result
+    diagnosis = result.get("message", {}).get("content") or ""
+    return {
+        "diagnosis": diagnosis,
+        "error_type": llm._extract_error_type(diagnosis),
+        "math_verification": math_verification,
+        "agent_type": "diagnosis",
+        "credential_source": result.get("credential_source"),
+        "credential_fingerprint": result.get("credential_fingerprint"),
+    }
 
 
 @router.post("/summary", response_model=dict)
 def session_summary(
     request: SummaryRequest,
-    user_id: Optional[str] = None,
     session_id: Optional[int] = None,
     db: Session = Depends(get_db),
     llm: LLMService = Depends(get_llm_service),
-    current_user: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """生成 Session 总结"""
-    user_id = current_user
+    user_id = current_user.username
     analytics = AnalyticsService(db)
-    
-    result = llm.session_summary(
-        session_stats=request.session_stats,
+    prompt = f"""本次训练 Session 统计：
+- 总题数：{request.session_stats.get('total_questions', 0)}
+- 正确数：{request.session_stats.get('correct_count', 0)}
+- 正确率：{request.session_stats.get('correct_rate', 0):.1%}
+- 平均用时：{request.session_stats.get('average_time', 0):.1f} 秒
+
+请生成一段鼓励性的总结，包括：
+1. 肯定学生的努力
+2. 指出进步的地方
+3. 给出下一步学习建议
+4. 保持积极正面的语调"""
+    resolved = _resolve_provider_or_raise(db, current_user, "auto")
+    result = llm.complete_chat(
+        resolved=resolved,
+        messages=[{"role": "user", "content": prompt}],
+        prompt_profile="custom",
+        system_prompt_override=llm.agent_prompts["pomodoro_coach"],
+        agent_type=f"pomodoro_coach:{resolved.provider_id}",
         user_id=user_id,
         session_id=session_id,
         analytics=analytics,
+        max_tokens=300,
+        temperature=0.8,
     )
     
     if "error" in result:
         raise api_error(502, "llm_provider_error", "Model provider is temporarily unavailable")
+    if resolved.source == "user":
+        LLMCredentialService(db).record_used(resolved.credential_id)
     
-    return result
+    return {
+        "summary": result.get("message", {}).get("content"),
+        "agent_type": "pomodoro_coach",
+        "credential_source": result.get("credential_source"),
+        "credential_fingerprint": result.get("credential_fingerprint"),
+    }
 

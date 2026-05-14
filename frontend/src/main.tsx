@@ -9,6 +9,7 @@ import './index.css';
 import { SettingsProvider } from './utils/settings';
 import { ApiError } from './utils/apiClient';
 import { PomodoroProvider } from './features/pomodoro/PomodoroProvider';
+import { AuthProvider } from './auth/AuthContext';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -38,14 +39,16 @@ createRoot(document.getElementById("root")!).render(
           v7_relativeSplatPath: true,
         }}
       >
-        <PomodoroProvider>
-          <SettingsProvider>
-            <ErrorBoundary>
-              <App />
-              <Toaster richColors />
-            </ErrorBoundary>
-          </SettingsProvider>
-        </PomodoroProvider>
+        <AuthProvider>
+          <PomodoroProvider>
+            <SettingsProvider>
+              <ErrorBoundary>
+                <App />
+                <Toaster richColors />
+              </ErrorBoundary>
+            </SettingsProvider>
+          </PomodoroProvider>
+        </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
   </StrictMode>

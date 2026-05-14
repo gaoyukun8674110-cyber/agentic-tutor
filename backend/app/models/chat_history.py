@@ -10,7 +10,7 @@ class TutorConversation(Base):
     __tablename__ = "tutor_conversations"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String(100), nullable=True, index=True)
+    user_id = Column(String(100), ForeignKey("users.username", ondelete="CASCADE"), nullable=False, index=True)
     title = Column(String(120), nullable=False)
     training_mode = Column(String(50), nullable=True)
     prompt_profile = Column(String(50), nullable=True)

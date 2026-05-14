@@ -8,11 +8,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.api.deps import get_current_user
 from app.config import settings
 from app.database import Base, get_db
 from app.api.materials import router as materials_router
-
-AUTH_HEADERS = {"X-API-Key": "local-dev-key"}
+from app.models.user import User
 
 
 class MaterialsApiTests(unittest.TestCase):
@@ -43,6 +43,14 @@ class MaterialsApiTests(unittest.TestCase):
                 pass
 
         app.dependency_overrides[get_db] = override_db
+        app.dependency_overrides[get_current_user] = lambda: User(
+            id=1,
+            username="alice",
+            email=None,
+            is_active=True,
+            created_at="now",
+            updated_at="now",
+        )
         app.include_router(materials_router)
         self.client = TestClient(app)
 
@@ -56,8 +64,7 @@ class MaterialsApiTests(unittest.TestCase):
     def test_upload_list_and_search_materials(self):
         upload_response = self.client.post(
             "/api/materials/upload",
-            params={"user_id": "learner-1"},
-            headers=AUTH_HEADERS,
+            params={"user_id": "bob"},
             files={"file": ("probability.txt", b"Bayes theorem uses posterior probability.", "text/plain")},
         )
 
@@ -67,7 +74,7 @@ class MaterialsApiTests(unittest.TestCase):
         self.assertEqual(material["status"], "pending")
         self.assertEqual(material["embedding_mode"], "hash")
 
-        list_response = self.client.get("/api/materials", params={"user_id": "learner-1"}, headers=AUTH_HEADERS)
+        list_response = self.client.get("/api/materials", params={"user_id": "bob"})
         self.assertEqual(list_response.status_code, 200)
         listed_material = list_response.json()["materials"][0]
         self.assertEqual(listed_material["id"], material["id"])
@@ -77,8 +84,7 @@ class MaterialsApiTests(unittest.TestCase):
 
         search_response = self.client.post(
             "/api/materials/search",
-            params={"user_id": "learner-1"},
-            headers=AUTH_HEADERS,
+            params={"user_id": "bob"},
             json={"query": "posterior probability", "top_k": 2},
         )
         self.assertEqual(search_response.status_code, 200)
@@ -93,7 +99,6 @@ class MaterialsApiTests(unittest.TestCase):
     def test_upload_rejects_oversized_file(self):
         response = self.client.post(
             "/api/materials/upload",
-            headers=AUTH_HEADERS,
             files={"file": ("large.txt", b"x" * (2 * 1024 * 1024), "text/plain")},
         )
 
@@ -102,7 +107,6 @@ class MaterialsApiTests(unittest.TestCase):
     def test_upload_rejects_mismatched_pdf_signature(self):
         response = self.client.post(
             "/api/materials/upload",
-            headers=AUTH_HEADERS,
             files={"file": ("notes.pdf", b"not really a pdf", "application/pdf")},
         )
 

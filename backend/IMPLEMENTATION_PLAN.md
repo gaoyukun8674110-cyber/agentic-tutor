@@ -5,15 +5,16 @@ This is the only active backend planning file.
 All backend spec and progress documents have been consolidated into this file.
 
 ## Current Status
-- Status: backend remediation and Tutor platform scope from 2026-04-29 through 2026-05-08 is complete.
+- Status: multi-user authentication and backend data isolation are implemented.
 - Mandatory backend backlog from the archived planning set: none.
-- Verification gap carried from archived notes: local `ruff` and `mypy` execution was not completed in the constrained environment, even though config and CI support were added.
+- Verification baseline now includes local `compileall` and the full backend `unittest` suite.
 
 ## Backend Responsibilities
 - Own provider configuration, prompt profiles, and LLM API calls.
 - Persist Tutor conversation history, summaries, and context handoff.
 - Ingest study materials, generate embeddings, and serve filtered retrieval.
 - Expose public error contracts, auth boundaries, and baseline security headers.
+- Own user registration, login, access-token validation, refresh-token rotation, logout, and per-user data isolation.
 
 ## Consolidated Delivery Scope
 
@@ -49,6 +50,7 @@ All backend spec and progress documents have been consolidated into this file.
 
 ### 5. Validation Baseline
 - Backend run: `python start.py`
+- Backend migrations: `python -m alembic upgrade head`
 - Backend tests: `python -m unittest discover -s tests -v`
 - Backend import validation: `python -m compileall app tests`
 - Focused regression suites from the archived work covered:
@@ -57,9 +59,16 @@ All backend spec and progress documents have been consolidated into this file.
   - auth, CORS, upload validation, and public error schema,
   - indexed material retrieval and provider-client reuse.
 
+### 6. Multi-User Authentication and Isolation
+- Added `app/auth/`, `app/api/auth.py`, `User`, and `RefreshToken`.
+- Replaced `X-API-Key` app authentication with JWT bearer access tokens and HttpOnly refresh cookies.
+- Updated dashboard, Tutor history, materials, training, and student APIs to scope reads and writes to `current_user.username`.
+- Added Alembic migrations for `users`, `refresh_tokens`, legacy data backfill to `test-01`, non-null user ownership on migrated tables, and a final verification revision for the demo user and legacy ownership.
+- Added auth and isolation regression coverage, including cross-user dashboard, student, Tutor conversation, and material scoping tests.
+
 ## Remaining Backend Follow-Up
 - No mandatory backend implementation item remains open from the archived planning set.
-- When local tooling is available, run `ruff` and `mypy` against the configured backend environment to close the remaining verification gap.
+- Run `ruff` and `mypy` before the next production hardening pass if typing/style gates are required by CI.
 
 ## Consolidated Sources
 The following backend planning documents were consolidated into this file and then removed to avoid duplicate planning inputs:

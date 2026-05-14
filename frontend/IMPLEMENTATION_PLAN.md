@@ -5,12 +5,13 @@ This is the only active frontend planning file.
 All frontend spec, theme-plan, and progress documents have been consolidated into this file.
 
 ## Current Status
-- Status: frontend remediation and Tutor UX scope from 2026-05-02 through 2026-05-08 is complete.
+- Status: frontend multi-user auth UX and authenticated API transport are implemented.
 - Active frontend backlog from the archived planning set: add richer end-to-end UI coverage once the project adopts a first-class frontend E2E runner.
 
 ## Frontend Responsibilities
 - Own dashboard and Tutor workspace UX.
 - Consume backend APIs through shared frontend API clients.
+- Own login, registration, route guarding, access-token memory state, refresh retry, and logout UX.
 - Maintain routed application structure, persisted settings, and shared Pomodoro state.
 - Render Tutor messages safely, including Markdown and math notation.
 
@@ -46,10 +47,18 @@ All frontend spec, theme-plan, and progress documents have been consolidated int
 - Eliminated router future warnings and oversized bundle warnings through lazy routes and targeted chunking.
 - Fixed the Select menu opacity regression after theme refactoring.
 
+### 6. Multi-User Authentication UX
+- Added `/login` and `/register` pages plus `AuthProvider` and `ProtectedRoute`.
+- Replaced shared `X-API-Key` requests with bearer access tokens, `credentials: include`, single-flight refresh, and one-time request replay after 401.
+- Removed hardcoded `local` user usage from dashboard, Tutor, task, and Pomodoro calls.
+- Updated the top navigation to show the authenticated user and expose logout.
+- Added API client regression tests for auth localization, cookie transport, refresh retry, and concurrent refresh deduplication.
+
 ## Validation Baseline
 - Frontend run: `npm run dev`
 - Frontend type check: `npm run type-check`
 - Frontend lint: `npm run lint`
+- Frontend unit tests: `npm run test:run`
 - Frontend build: `npm run build`
 - Archived validation also covered targeted regression scripts for:
   - math rendering,

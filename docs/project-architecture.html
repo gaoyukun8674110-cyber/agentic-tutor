@@ -1,0 +1,1032 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Tutor 五层项目架构交互图</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f8ff;
+      --panel: #ffffff;
+      --panel-2: #e8f1ff;
+      --ink: #12263f;
+      --muted: #5b708a;
+      --line: #c8d7eb;
+      --brass: #1b66d2;
+      --mint: #0d8eb8;
+      --coral: #2f80ed;
+      --blue: #2268c8;
+      --violet: #6f8fdc;
+      --green: #098c6f;
+      --shadow: 0 24px 70px rgba(38, 92, 153, .16);
+      --radius: 8px;
+      font-family: "Aptos Display", "Segoe UI", "Microsoft YaHei UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        linear-gradient(120deg, rgba(47, 128, 237, .14), transparent 42%),
+        radial-gradient(circle at 74% 12%, rgba(13, 142, 184, .16), transparent 26%),
+        linear-gradient(180deg, #f8fbff 0%, #e8f1ff 100%);
+      color: var(--ink);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: .52;
+      background-image:
+        linear-gradient(rgba(34,104,200,.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(34,104,200,.08) 1px, transparent 1px);
+      background-size: 42px 42px;
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,.7), transparent 82%);
+    }
+
+    .shell {
+      width: min(1440px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 28px 0 42px;
+      position: relative;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 24px;
+      align-items: end;
+      margin-bottom: 22px;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 980px;
+      font-family: Georgia, "Songti SC", serif;
+      font-size: clamp(34px, 5.2vw, 72px);
+      font-weight: 600;
+      line-height: .95;
+      letter-spacing: 0;
+    }
+
+    .subhead {
+      max-width: 870px;
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.7;
+    }
+
+    .stamp {
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, .88);
+      box-shadow: var(--shadow);
+      padding: 14px 16px;
+      min-width: 230px;
+    }
+
+    .stamp strong {
+      display: block;
+      color: var(--brass);
+      font-size: 13px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .stamp span {
+      display: block;
+      color: var(--muted);
+      margin-top: 8px;
+      line-height: 1.45;
+      font-size: 13px;
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: minmax(240px, 1fr) auto auto;
+      gap: 10px;
+      margin-bottom: 18px;
+      align-items: center;
+    }
+
+    .search {
+      position: relative;
+    }
+
+    input[type="search"] {
+      width: 100%;
+      height: 44px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, .96);
+      color: var(--ink);
+      padding: 0 14px 0 40px;
+      outline: none;
+      font-size: 14px;
+    }
+
+    .search svg {
+      position: absolute;
+      left: 13px;
+      top: 12px;
+      width: 18px;
+      height: 18px;
+      color: var(--muted);
+    }
+
+    .segmented {
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, .96);
+    }
+
+    button {
+      border: 0;
+      color: var(--ink);
+      background: transparent;
+      cursor: pointer;
+      font: inherit;
+    }
+
+    .segmented button,
+    .ghost-button {
+      height: 34px;
+      border-radius: 6px;
+      padding: 0 12px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .segmented button.active,
+    .ghost-button.active {
+      background: var(--panel-2);
+      color: var(--ink);
+      box-shadow: inset 0 0 0 1px rgba(34,104,200,.08);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(600px, 1.35fr) minmax(340px, .65fr);
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .board,
+    .side,
+    .section {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, .92);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .board {
+      min-height: 780px;
+      position: relative;
+    }
+
+    .board-head,
+    .side-head,
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(232, 241, 255, .72);
+    }
+
+    .eyebrow {
+      color: var(--brass);
+      font-size: 12px;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+
+    .board-title,
+    .side-title,
+    .section-title {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .legend span {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--brass);
+    }
+
+    .map-wrap {
+      position: relative;
+      height: 718px;
+      overflow: hidden;
+      background:
+        linear-gradient(90deg, rgba(34,104,200,.08) 1px, transparent 1px),
+        linear-gradient(rgba(34,104,200,.08) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    #architectureMap {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .link {
+      stroke: rgba(34, 104, 200, .24);
+      stroke-width: 1.6;
+      fill: none;
+      transition: stroke .2s ease, stroke-width .2s ease, opacity .2s ease;
+    }
+
+    .link.active {
+      stroke: #0d5dc2;
+      stroke-width: 3;
+      opacity: 1;
+    }
+
+    .node-card {
+      transition: transform .18s ease, opacity .18s ease;
+      cursor: pointer;
+    }
+
+    .node-card:hover {
+      transform: translateY(-2px);
+    }
+
+    .node-card.dimmed {
+      opacity: .24;
+    }
+
+    .node-card rect {
+      fill: #ffffff;
+      stroke: #b7cae5;
+      stroke-width: 1;
+      rx: 8;
+    }
+
+    .node-card.active rect {
+      stroke: var(--brass);
+      stroke-width: 2;
+      filter: drop-shadow(0 8px 18px rgba(13,93,194,.2));
+    }
+
+    .node-title {
+      font-size: 14px;
+      font-weight: 700;
+      fill: var(--ink);
+    }
+
+    .node-meta {
+      font-size: 11px;
+      fill: var(--muted);
+    }
+
+    .node-badge {
+      font-size: 10px;
+      fill: #ffffff;
+      font-weight: 700;
+    }
+
+    .side {
+      min-height: 780px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .detail {
+      padding: 18px;
+      overflow: auto;
+      flex: 1;
+    }
+
+    .detail h2 {
+      margin: 0 0 10px;
+      font-family: Georgia, "Songti SC", serif;
+      font-size: 28px;
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    .detail p {
+      margin: 0 0 14px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 14px 0;
+    }
+
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 9px;
+      color: var(--muted);
+      font-size: 12px;
+      background: rgba(34,104,200,.05);
+    }
+
+    .detail-list {
+      display: grid;
+      gap: 10px;
+      margin: 18px 0 0;
+    }
+
+    .fact {
+      border-left: 3px solid var(--brass);
+      padding: 10px 12px;
+      background: rgba(34,104,200,.055);
+      color: #28435f;
+      line-height: 1.55;
+      font-size: 13px;
+    }
+
+    .sections {
+      display: grid;
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .section {
+      box-shadow: none;
+    }
+
+    .section-body {
+      padding: 16px;
+    }
+
+    .flow-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .flow-tabs button {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 12px;
+      color: var(--muted);
+      background: rgba(34,104,200,.04);
+      font-size: 13px;
+    }
+
+    .flow-tabs button.active {
+      color: var(--ink);
+      border-color: rgba(27,102,210,.7);
+      background: rgba(34,104,200,.1);
+    }
+
+    .flow-line {
+      display: grid;
+      grid-template-columns: 32px minmax(0, 1fr);
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(34,104,200,.12);
+    }
+
+    .flow-line:last-child { border-bottom: 0; }
+
+    .flow-number {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: var(--panel-2);
+      color: var(--brass);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .flow-line strong {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    .flow-line span {
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 13px;
+    }
+
+    .matrix {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .metric {
+      background: rgba(34,104,200,.045);
+      border: 1px solid rgba(34,104,200,.12);
+      border-radius: var(--radius);
+      padding: 14px;
+      min-height: 110px;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 25px;
+      color: var(--mint);
+      margin-bottom: 8px;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 13px;
+    }
+
+    .risk-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .risk {
+      border: 1px solid rgba(34,104,200,.12);
+      border-radius: var(--radius);
+      padding: 13px;
+      background: rgba(34,104,200,.045);
+    }
+
+    .risk b {
+      color: var(--coral);
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .risk span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .mini-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .mini-table th,
+    .mini-table td {
+      text-align: left;
+      vertical-align: top;
+      padding: 10px;
+      border-bottom: 1px solid rgba(34,104,200,.12);
+    }
+
+    .mini-table th {
+      color: var(--brass);
+      font-size: 12px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .mini-table td {
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    code {
+      color: #0d5dc2;
+      background: rgba(34,104,200,.09);
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-family: "Cascadia Code", "Consolas", monospace;
+      font-size: .92em;
+    }
+
+    @media (max-width: 1080px) {
+      header,
+      .toolbar,
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .stamp {
+        min-width: 0;
+      }
+
+      .board,
+      .side {
+        min-height: auto;
+      }
+
+      .map-wrap {
+        height: 560px;
+      }
+
+      .matrix,
+      .risk-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .shell {
+        width: min(100vw - 18px, 1440px);
+        padding-top: 16px;
+      }
+
+      .segmented {
+        overflow-x: auto;
+      }
+
+      .board-head,
+      .side-head,
+      .section-head {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .map-wrap {
+        height: 500px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div>
+        <div class="eyebrow">AI Tutor Monorepo Architecture</div>
+        <h1>五层项目架构交互图</h1>
+        <p class="subhead">
+          这份 HTML 按项目实际边界重画为 5 列：展示层、前端适配层、后端 API 层、后端服务层、数据与外部资源层。同一层固定在同一列，节点副标题标注主要技术，线条表示真实交互方向。
+        </p>
+      </div>
+      <aside class="stamp">
+        <strong>Snapshot</strong>
+        <span>读取日期：2026-05-14<br />主要栈：React 18 + Vite 6 + FastAPI + SQLAlchemy + Alembic + SQLite</span>
+      </aside>
+    </header>
+
+    <div class="toolbar">
+      <label class="search" aria-label="搜索架构节点">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="m21 21-4.35-4.35m1.35-5.15a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <input id="searchInput" type="search" placeholder="搜索模块、职责、文件路径，例如 Auth、RAG、apiClient、LLM..." />
+      </label>
+      <div class="segmented" id="layerFilter" aria-label="按层过滤">
+        <button class="active" data-layer="all">全部</button>
+        <button data-layer="ui">L1 UI</button>
+        <button data-layer="adapter">L2 前端适配</button>
+        <button data-layer="api">L3 后端 API</button>
+        <button data-layer="service">L4 服务</button>
+        <button data-layer="data">L5 数据/外部</button>
+      </div>
+      <button class="ghost-button" id="resetView">重置视图</button>
+    </div>
+
+    <section class="grid">
+      <article class="board">
+        <div class="board-head">
+          <div>
+            <div class="eyebrow">Interactive topology</div>
+            <div class="board-title">五层运行时拓扑</div>
+          </div>
+          <div class="legend">
+            <span><i class="dot" style="background:var(--mint)"></i>L1 展示层</span>
+            <span><i class="dot" style="background:var(--blue)"></i>L2/L3 适配与 API</span>
+            <span><i class="dot" style="background:var(--violet)"></i>L4 服务层</span>
+            <span><i class="dot" style="background:var(--brass)"></i>L5 数据/外部</span>
+          </div>
+        </div>
+        <div class="map-wrap">
+          <svg id="architectureMap" viewBox="0 0 1100 720" role="img" aria-label="AI Tutor five-layer interactive architecture map"></svg>
+        </div>
+      </article>
+
+      <aside class="side">
+        <div class="side-head">
+          <div>
+            <div class="eyebrow">Module inspector</div>
+            <div class="side-title">模块详情</div>
+          </div>
+        </div>
+        <div class="detail" id="detailPanel"></div>
+      </aside>
+    </section>
+
+    <section class="sections">
+      <article class="section">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow">Runtime flows</div>
+            <div class="section-title">关键数据流</div>
+          </div>
+        </div>
+        <div class="section-body">
+          <div class="flow-tabs" id="flowTabs"></div>
+          <div id="flowBody"></div>
+        </div>
+      </article>
+
+      <article class="section">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow">Repository reading</div>
+            <div class="section-title">深入解读摘要</div>
+          </div>
+        </div>
+        <div class="section-body">
+          <div class="matrix">
+            <div class="metric"><strong>2</strong><span>顶层应用：<code>frontend/</code> 是 Vite React SPA，<code>backend/</code> 是 FastAPI API 服务。</span></div>
+            <div class="metric"><strong>8</strong><span>后端路由域：auth、dashboard、llm、materials、questions、training、student、analytics。</span></div>
+            <div class="metric"><strong>4</strong><span>前端全局 provider：QueryClient、Auth、Pomodoro、Settings，外围还有 ErrorBoundary 与 Toaster。</span></div>
+            <div class="metric"><strong>16+</strong><span>核心持久化表：users、refresh_tokens、student、training、question、chat history、materials、dashboard、LLM credentials。</span></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="section">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow">Boundary notes</div>
+            <div class="section-title">架构关注点和风险</div>
+          </div>
+        </div>
+        <div class="section-body">
+          <div class="risk-grid">
+            <div class="risk"><b>端口和 URL 默认值不一致</b><span><code>backend/start.py</code> 启动 8001，README 写 8000，<code>apiClient.ts</code> fallback 是 8001，<code>frontend/.env.example</code> 当前为 HTTPS 8000。生产部署需要统一 API base、CORS origin、反向代理和 HSTS 策略。</span></div>
+            <div class="risk"><b>用户隔离主键混用</b><span>业务表多处用 <code>users.username</code> 作为 <code>user_id</code>，LLM 凭证用 <code>users.id</code>。这能降低迁移成本，但后续如果重命名 username 会影响业务隔离语义。</span></div>
+            <div class="risk"><b>RAG 索引是本地文件快照</b><span>资料 chunk 入库后会重建 <code>storage/materials/.vector-index.json</code>。多实例部署时需要共享存储或迁移到数据库/向量库，否则实例间索引会分叉。</span></div>
+            <div class="risk"><b>中文源码存在编码显示问题</b><span>部分源码和文档在当前 PowerShell 输出中呈现 mojibake。功能不一定受影响，但维护体验和审阅质量会下降，建议统一 UTF-8 读写与编辑器设置。</span></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="section">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow">Layer map</div>
+            <div class="section-title">文件到职责映射</div>
+          </div>
+        </div>
+        <div class="section-body">
+          <table class="mini-table">
+            <thead><tr><th>层</th><th>关键文件</th><th>职责</th></tr></thead>
+            <tbody>
+              <tr><td>前端入口</td><td><code>frontend/src/main.tsx</code>, <code>App.tsx</code></td><td>挂载 Query/Auth/Pomodoro/Settings provider，声明登录、注册、Dashboard、Tutor、模型设置路由。</td></tr>
+              <tr><td>前端 API</td><td><code>utils/apiClient.ts</code>, <code>chatApi.ts</code>, <code>dashboardApi.ts</code>, <code>llmCredentialsApi.ts</code></td><td>统一 Bearer token、cookie refresh、错误本地化、业务 API 包装。</td></tr>
+              <tr><td>后端入口</td><td><code>backend/app/main.py</code>, <code>config.py</code>, <code>database.py</code></td><td>FastAPI 应用、中间件、安全响应头、CORS、数据库连接、运行时配置。</td></tr>
+              <tr><td>认证</td><td><code>api/auth.py</code>, <code>api/deps.py</code>, <code>app/auth/*</code></td><td>注册/登录/刷新/登出/me，JWT access token，httpOnly refresh cookie，路由级 current_user。</td></tr>
+              <tr><td>Tutor/LLM</td><td><code>api/llm.py</code>, <code>services/llm_service.py</code>, <code>llm_credential_*.py</code></td><td>provider metadata、用户级 API Key、prompt profile、聊天持久化、材料上下文注入、LLM 调用。</td></tr>
+              <tr><td>学习资料</td><td><code>api/materials.py</code>, <code>services/materials.py</code>, <code>services/vector_index.py</code></td><td>上传 txt/md/docx/pdf/epub，提取文本、chunk、embedding、本地索引、按用户检索。</td></tr>
+              <tr><td>训练和画像</td><td><code>training_engine.py</code>, <code>student_model.py</code>, <code>question_bank.py</code></td><td>按掌握度与目标技能生成训练 session、选题、判题、更新学生掌握度。</td></tr>
+              <tr><td>测试与迁移</td><td><code>backend/tests/*</code>, <code>frontend/src/**/*.test.*</code>, <code>alembic/versions/*</code></td><td>覆盖认证、隔离、RAG、LLM、Dashboard、前端 API 和组件行为；Alembic 管理 schema 演进。</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    let nodes = [
+      { id: "browser", layer: "frontend", x: 44, y: 70, w: 170, h: 78, title: "Browser SPA", meta: "Vite + React Router", color: "var(--mint)", tags: ["frontend/src/App.tsx", "frontend/src/main.tsx"], details: "浏览器端单页应用，入口由 main.tsx 挂载 QueryClient、BrowserRouter、AuthProvider、PomodoroProvider、SettingsProvider、ErrorBoundary 和 Toaster。App.tsx 用 ProtectedRoute 保护 /、/tutor、/settings/model。", facts: ["登录和注册页不在保护路由内。", "Dashboard、Tutor、模型设置都依赖 AuthContext 的 user。", "Vite 脚本固定 host 和 4173 端口。"] },
+      { id: "auth-ui", layer: "frontend", x: 44, y: 192, w: 170, h: 78, title: "Auth UI", meta: "Login/Register", color: "var(--mint)", tags: ["LoginPage.tsx", "RegisterPage.tsx", "AuthContext.tsx"], details: "前端认证状态机负责启动时 refresh、登录时保存 access token 到模块内存、登出时清理 token 和 user。ProtectedRoute 未登录时跳转 /login，并保留 from。", facts: ["access token 不持久化到 localStorage。", "refresh token 通过 httpOnly cookie 由浏览器携带。", "apiClient 监听 auth:logout 事件触发前端登出。"] },
+      { id: "dashboard-ui", layer: "frontend", x: 44, y: 314, w: 170, h: 78, title: "Dashboard UI", meta: "tasks + focus", color: "var(--mint)", tags: ["DashboardPage.tsx", "TodayPlan.tsx", "StudyCalendar.tsx"], details: "Dashboard 页面通过 React Query 拉取 summary，展示今日任务、专注分钟、连续学习、日历事件和番茄钟统计。TodayPlan 通过 dashboardApi 创建、更新、删除任务。", facts: ["query key 包含登录用户名。", "Pomodoro 完成后会使 dashboard summary 失效刷新。", "汇总数据由后端聚合任务、番茄钟、训练和聊天历史。"] },
+      { id: "tutor-ui", layer: "frontend", x: 44, y: 436, w: 170, h: 78, title: "Tutor Workspace", meta: "chat + materials", color: "var(--mint)", tags: ["TutorChatWorkspace.tsx", "useTutorChat.ts", "useTutorMaterials.ts"], details: "Tutor 工作台组合聊天消息、输入框、学习策略、材料选择、历史会话和番茄钟。useTutorChat 负责发送消息、取消请求、失败重试、会话摘要承接和 material_ids 注入。", facts: ["请求 provider 默认为 auto。", "聊天响应可回写 conversation、messages、learning_phase 和 credential_source。", "选中的学习资料 ID 会进入 tutor_context。"] },
+      { id: "settings-ui", layer: "frontend", x: 44, y: 548, w: 170, h: 58, title: "Model Settings", meta: "/settings/model", color: "var(--mint)", tags: ["SettingsModelPage.tsx", "llmCredentialsApi.ts"], details: "模型设置页让登录用户管理自己的 provider API Key、base_url、默认模型、启用状态和默认 provider。前端只提交明文 key，不再读取明文。", facts: ["PUT 用于写入或替换 API Key。", "PATCH 不允许包含 api_key。", "测试 provider 有后端限速保护。"] },
+
+      { id: "api-client", layer: "frontend", x: 300, y: 192, w: 176, h: 86, title: "apiClient", meta: "Bearer + refresh", color: "var(--mint)", tags: ["utils/apiClient.ts"], details: "前端所有业务请求通过 apiFetch/apiUpload 走同一个客户端。它追加 Authorization、Accept-Language 和 credentials: include，遇到非 auth 路径 401 时单飞调用 /api/auth/refresh，再重放原请求。", facts: ["skipAuthRefresh 防止 auth endpoint 自己触发 refresh 循环。", "refreshInFlight 合并并发刷新。", "错误统一抛 ApiError，附带 status、code、traceId。"] },
+
+      { id: "fastapi", layer: "backend", x: 560, y: 80, w: 180, h: 86, title: "FastAPI App", meta: "routers + middleware", color: "var(--blue)", tags: ["backend/app/main.py"], details: "FastAPI 应用注册 auth、questions、training、student、llm、analytics、dashboard、materials 路由。启动时初始化数据库并在 app.state 放入 LLMService。中间件设置安全响应头。", facts: ["DEBUG=False 时添加 Strict-Transport-Security。", "CORS allow_credentials=True。", "start.py 本地启动端口是 8001。"] },
+      { id: "auth-api", layer: "backend", x: 560, y: 206, w: 180, h: 86, title: "Auth API", meta: "JWT + refresh cookie", color: "var(--blue)", tags: ["api/auth.py", "api/deps.py", "app/auth/tokens.py"], details: "认证 API 提供 register、login、refresh、logout、me。get_current_user 从 Authorization Bearer 解码 access token 并查找 active user，业务路由通过 Depends 获取 User。", facts: ["refresh token 只存 SHA-256 hash。", "refresh 使用后会轮换并撤销旧 token。", "require_matching_user 防止 path user_id 越权。"] },
+      { id: "dashboard-api", layer: "backend", x: 560, y: 330, w: 180, h: 86, title: "Dashboard API", meta: "summary + tasks", color: "var(--blue)", tags: ["api/dashboard.py", "services/dashboard.py"], details: "Dashboard API 按 current_user.username 处理 summary、tasks 和 pomodoro。DashboardService 聚合 DashboardTask、PomodoroLog、TrainingSession、StudentAnswer、TutorConversation。", facts: ["任务 CRUD 均按 user_id 过滤。", "summary 的 weekly_data 和 calendar_events 来自多张表。", "番茄钟日志是 Dashboard 统计的主要输入之一。"] },
+      { id: "llm-api", layer: "backend", x: 560, y: 454, w: 180, h: 86, title: "LLM API", meta: "chat + providers", color: "var(--blue)", tags: ["api/llm.py", "services/llm_service.py"], details: "LLM API 管理 provider metadata、用户凭证 CRUD、prompt profiles、历史会话和 /chat。聊天时解析 provider，注入学习阶段、材料上下文和历史摘要，再调用 LLMService.complete_chat。", facts: ["会话超过阈值会生成摘要。", "响应包含 credential_source 和 credential_fingerprint。", "provider test 有 per-user + per-provider 速率限制。"] },
+      { id: "materials-api", layer: "backend", x: 560, y: 560, w: 180, h: 58, title: "Materials API", meta: "upload + search", color: "var(--blue)", tags: ["api/materials.py", "services/materials.py"], details: "学习资料 API 接收上传、列出资料、执行材料检索。MaterialService 支持 txt、md、docx、pdf、epub，提取文本后切块、embedding、持久化，并维护本地向量索引快照。", facts: ["无 OpenAI key 时使用 deterministic hash embedding。", "检索时按 user_id 和 material_ids 过滤。", "上传后会重建 vector-index 快照。"] },
+
+      { id: "services", layer: "backend", x: 806, y: 206, w: 144, h: 86, title: "Service Layer", meta: "business logic", color: "var(--blue)", tags: ["backend/app/services/*"], details: "服务层承载主要业务规则：ChatHistory、Dashboard、Material、TrainingEngine、StudentModel、QuestionBank、Analytics、LLM credential resolver。API 层多为权限和请求响应编排。", facts: ["ChatHistoryService 负责会话摘要、导出和历史检索。", "TrainingEngine 负责 session、选题、答题和下一步策略。", "AnalyticsService 记录 answer、API、LLM 行为。"] },
+      { id: "db", layer: "data", x: 806, y: 330, w: 144, h: 86, title: "SQLite DB", meta: "tutor.db + Alembic", color: "var(--brass)", tags: ["backend/app/models/*", "alembic/versions/*"], details: "当前默认数据库是 backend/tutor.db，SQLAlchemy Base 管理模型，Alembic 管理迁移。核心表覆盖用户、refresh token、学生画像、题库、训练、聊天历史、资料、Dashboard 和用户级 LLM 凭证。", facts: ["DEFAULT_DATABASE_URL 指向 backend/tutor.db。", "多用户隔离多数业务表使用 users.username 字符串。", "LLM credentials 用 users.id 整数 FK。"] },
+      { id: "storage", layer: "data", x: 806, y: 454, w: 144, h: 86, title: "File Storage", meta: "materials + vector index", color: "var(--brass)", tags: ["storage/materials", ".vector-index.json"], details: "资料原文件存入 RAG_UPLOAD_DIR，默认 storage/materials。向量索引以 .vector-index.json 持久化，MaterialService 在上传和填充 embedding 后重建它。", facts: ["文件名包含内容 hash 前缀。", "索引项包含 chunk_id、material_id、user_id、vector。", "多实例部署时这是需要共享或替换的状态。"] },
+      { id: "external", layer: "ops", x: 806, y: 560, w: 144, h: 58, title: "LLM Providers", meta: "OpenAI-compatible", color: "var(--coral)", tags: ["OpenAI", "DeepSeek", "Qwen", "LinkAPI", "Ollama"], details: "provider registry 支持 OpenAI、DeepSeek、Qwen、LinkAPI、Ollama 等 OpenAI-compatible 接口。Anthropic/Gemini 目前在配置中是 native placeholder，adapter 未实现。", facts: ["auto 会优先用户默认凭证，其次 fallback。", "Ollama 不要求 API Key。", "用户 base_url 写入前有 SSRF 防护。"] },
+      { id: "tests", layer: "ops", x: 300, y: 454, w: 176, h: 86, title: "Tests & Scripts", meta: "unit + browser checks", color: "var(--violet)", tags: ["backend/tests", "frontend/src/*.test", "scripts/test.ps1"], details: "仓库已有后端 unittest、前端 Vitest/Testing Library，以及若干 Playwright/MJS 脚本覆盖数学渲染、P0/P1/P2 audit、番茄钟持久化等。根脚本 scripts/test.ps1 提供整体验证入口。", facts: ["后端测试覆盖 auth、isolation、RAG、LLM、dashboard 等。", "前端测试覆盖 apiClient、useTutorChat、组件和工具函数。", "package.json 提供 type-check、lint、test:run、build。"] },
+      { id: "ops", layer: "ops", x: 300, y: 70, w: 176, h: 78, title: "Deployment Config", meta: ".env + CORS + HTTPS", color: "var(--coral)", tags: [".env.example", "README.md", "config.py"], details: "部署相关配置分布在 README、frontend/.env.example、backend/.env.example 和 config.py。生产环境需要统一 HTTPS API base、COOKIE_SECURE、CORS_ORIGINS、JWT_SECRET、LLM encryption key 和反向代理端口。", facts: ["frontend/.env.example 当前 API base 是 https://localhost:8000。", "apiClient.ts fallback 仍是 http://localhost:8001。", "CORS_ORIGINS 默认仅列本地 HTTP origin。"] }
+    ];
+
+    nodes = [
+      { id: "ui-shell", layer: "ui", badge: "L1", x: 30, y: 88, w: 176, h: 76, title: "应用外壳", meta: "React 18 + Vite 6", color: "var(--mint)", tags: ["frontend/src/main.tsx", "frontend/src/App.tsx", "React Router"], details: "展示层的入口。main.tsx 挂载 React、React Query、Router、Auth、Pomodoro、Settings、ErrorBoundary 和 Toaster；App.tsx 声明登录、注册、Dashboard、Tutor、模型设置等路由。", facts: ["技术：React 18、Vite 6、React Router。", "保护路由集中在 ProtectedRoute。", "页面本身不直接访问数据库或 LLM。"] },
+      { id: "ui-auth", layer: "ui", badge: "L1", x: 30, y: 190, w: 176, h: 76, title: "登录/注册页面", meta: "TSX pages", color: "var(--mint)", tags: ["LoginPage.tsx", "RegisterPage.tsx"], details: "负责用户输入、表单状态、跳转和错误展示。实际认证请求交给 AuthContext 与 apiClient。", facts: ["技术：React hooks、react-router-dom。", "登录成功后进入原目标路由或 Dashboard。", "注册成功后再引导登录。"] },
+      { id: "ui-dashboard", layer: "ui", badge: "L1", x: 30, y: 292, w: 176, h: 76, title: "Dashboard 页面", meta: "Recharts + TSX", color: "var(--mint)", tags: ["DashboardPage.tsx", "TodayPlan.tsx", "StudyStats.tsx", "StudyCalendar.tsx"], details: "展示学习总览、今日计划、专注统计、日历事件和任务操作，是用户进入系统后的主工作台。", facts: ["技术：React Query、Recharts、lucide-react。", "任务写操作由 TodayPlan 触发。", "番茄钟完成后刷新 Dashboard summary。"] },
+      { id: "ui-tutor", layer: "ui", badge: "L1", x: 30, y: 394, w: 176, h: 76, title: "Tutor 工作台", meta: "Markdown + KaTeX", color: "var(--mint)", tags: ["TutorChatWorkspace.tsx", "TutorMessageList.tsx", "TutorComposer.tsx", "MathMessage.tsx"], details: "核心聊天体验。负责消息列表、公式渲染、资料选择、历史会话、学习策略选择、番茄钟状态和模型配置入口。", facts: ["技术：react-markdown、remark-math、rehype-katex、rehype-sanitize。", "UI 不直接拼 provider key。", "材料 ID 和学习模式由 hook 写入上下文。"] },
+      { id: "ui-settings", layer: "ui", badge: "L1", x: 30, y: 496, w: 176, h: 76, title: "模型设置页", meta: "Provider form", color: "var(--mint)", tags: ["SettingsModelPage.tsx"], details: "用户维护自己的 LLM provider 配置，包括 API Key、Base URL、默认模型、默认 provider、启用/禁用和连通性测试。", facts: ["技术：React Query mutations。", "明文 API Key 保存成功后不再回显。", "用户可直观看到 provider 是否来自 user/global/local。"] },
+
+      { id: "state-providers", layer: "adapter", badge: "L2", x: 245, y: 88, w: 176, h: 76, title: "前端 Provider", meta: "Context + QueryClient", color: "var(--blue)", tags: ["AuthContext.tsx", "PomodoroProvider.tsx", "settings.tsx"], details: "前端适配层承载跨页面状态：认证用户、番茄钟状态、语言/设置、React Query 缓存。它隔离 UI 和 HTTP 细节。", facts: ["技术：React Context、TanStack Query。", "AuthProvider 启动时先尝试 refresh。", "Query retry 对 4xx ApiError 直接停止。"] },
+      { id: "api-client", layer: "adapter", badge: "L2", x: 245, y: 190, w: 176, h: 76, title: "统一 API Client", meta: "fetch + Bearer JWT", color: "var(--blue)", tags: ["utils/apiClient.ts"], details: "所有前端业务 API 的 HTTP 边界。负责 Authorization Bearer、credentials: include、Accept-Language、JSON 解析、ApiError、401 refresh 单飞与请求重放。", facts: ["技术：浏览器 fetch、AbortController。", "refreshInFlight 合并并发 token refresh。", "auth endpoint 通过 skipAuthRefresh 避免递归。"] },
+      { id: "feature-hooks", layer: "adapter", badge: "L2", x: 245, y: 292, w: 176, h: 76, title: "业务 Hook", meta: "React Query hooks", color: "var(--blue)", tags: ["useTutorChat.ts", "useTutorHistory.ts", "useTutorMaterials.ts"], details: "把 UI 事件转换为后端请求、缓存更新和局部状态机。Tutor 聊天、资料列表、历史会话和失败重试都在这一层被编排。", facts: ["技术：useReducer、useQuery、useMutation。", "聊天请求包含 tutor_context。", "会话响应会同步更新 query cache。"] },
+      { id: "api-wrappers", layer: "adapter", badge: "L2", x: 245, y: 394, w: 176, h: 76, title: "前端 API 包装", meta: "typed TS modules", color: "var(--blue)", tags: ["chatApi.ts", "dashboardApi.ts", "llmCredentialsApi.ts"], details: "把路径、请求体和响应类型收敛到 TypeScript 模块，页面和 hook 不直接硬编码 API 路径。", facts: ["技术：TypeScript interfaces。", "chatApi 覆盖 /api/llm 与 /api/materials。", "dashboardApi 覆盖 summary/tasks/pomodoro。"] },
+
+      { id: "fastapi", layer: "api", badge: "L3", x: 460, y: 88, w: 176, h: 76, title: "FastAPI 应用", meta: "FastAPI + middleware", color: "var(--coral)", tags: ["backend/app/main.py", "backend/app/config.py"], details: "后端 HTTP 入口。注册业务 router，配置 CORS、安全响应头、异常处理、startup 初始化数据库和 LLMService。", facts: ["技术：FastAPI、Starlette middleware、Pydantic Settings。", "DEBUG=False 时设置 HSTS。", "本地 start.py 使用 8001 端口。"] },
+      { id: "auth-api", layer: "api", badge: "L3", x: 460, y: 190, w: 176, h: 76, title: "认证 API", meta: "/api/auth/*", color: "var(--coral)", tags: ["api/auth.py", "api/deps.py"], details: "注册、登录、刷新、登出、当前用户。get_current_user 从 Bearer access token 解析用户，业务 API 只消费 current_user。", facts: ["技术：JWT、httpOnly refresh cookie、argon2。", "refresh token 服务端只存 hash。", "refresh 会轮换并撤销旧 token。"] },
+      { id: "dashboard-api", layer: "api", badge: "L3", x: 460, y: 292, w: 176, h: 76, title: "Dashboard API", meta: "/api/dashboard/*", color: "var(--coral)", tags: ["api/dashboard.py"], details: "Dashboard summary、任务 CRUD、番茄钟日志入口。所有操作按 current_user.username 归属。", facts: ["技术：FastAPI Depends、SQLAlchemy Session。", "写操作委托 DashboardService。", "summary 返回 weekly_data 和 calendar_events。"] },
+      { id: "llm-api", layer: "api", badge: "L3", x: 460, y: 394, w: 176, h: 76, title: "LLM API", meta: "/api/llm/*", color: "var(--coral)", tags: ["api/llm.py"], details: "Provider metadata、用户 LLM 凭证 CRUD、prompt profiles、聊天、hint/explain/diagnose/summary、会话历史和导出。", facts: ["技术：FastAPI、Pydantic、OpenAI-compatible payload。", "聊天前注入材料上下文和历史摘要。", "provider test 有进程内限速。"] },
+      { id: "materials-api", layer: "api", badge: "L3", x: 460, y: 496, w: 176, h: 76, title: "资料 API", meta: "/api/materials/*", color: "var(--coral)", tags: ["api/materials.py"], details: "学习资料上传、列表和检索 API。上传走 multipart，搜索走 JSON。", facts: ["技术：UploadFile、BackgroundTasks、FastAPI Depends。", "资料按 current_user.username 隔离。", "搜索结果会回到 Tutor chat 上下文。"] },
+      { id: "training-api", layer: "api", badge: "L3", x: 460, y: 598, w: 176, h: 76, title: "训练/学生 API", meta: "/api/training + /student", color: "var(--coral)", tags: ["api/training.py", "api/student.py", "api/questions.py", "api/analytics.py"], details: "训练 session、题库、学生掌握度、推荐、报告和分析统计的 HTTP 边界。", facts: ["技术：FastAPI routers、SQLAlchemy Session。", "student 路径通过 require_matching_user 防越权。", "训练 API 委托 TrainingEngine。"] },
+
+      { id: "auth-service", layer: "service", badge: "L4", x: 675, y: 88, w: 176, h: 76, title: "认证工具服务", meta: "tokens/passwords/cookies", color: "var(--violet)", tags: ["app/auth/tokens.py", "passwords.py", "cookies.py"], details: "封装密码 hash、JWT 编解码、refresh token 生成/哈希、cookie 设置和清理。", facts: ["技术：argon2/passlib、JWT、secrets。", "纯函数较多，便于单测。", "业务路由不直接处理密码算法。"] },
+      { id: "dashboard-service", layer: "service", badge: "L4", x: 675, y: 190, w: 176, h: 76, title: "DashboardService", meta: "aggregation service", color: "var(--violet)", tags: ["services/dashboard.py"], details: "任务持久化、番茄钟日志、今日/周统计、连续学习、日历事件聚合。", facts: ["技术：SQLAlchemy ORM。", "聚合 PomodoroLog、TrainingSession、StudentAnswer、TutorConversation。", "输出是前端直接消费的 dict。"] },
+      { id: "llm-service", layer: "service", badge: "L4", x: 675, y: 292, w: 176, h: 76, title: "LLM 编排服务", meta: "OpenAI SDK + prompt", color: "var(--violet)", tags: ["services/llm_service.py", "llm_credential_resolver.py"], details: "构造系统提示词、学习阶段指令、材料片段、provider client，并调用 OpenAI-compatible chat completions。", facts: ["技术：openai Python SDK。", "ResolvedProvider 屏蔽 api_key repr。", "响应包含 usage、latency、credential_source。"] },
+      { id: "history-service", layer: "service", badge: "L4", x: 675, y: 394, w: 176, h: 76, title: "聊天历史服务", meta: "conversation memory", color: "var(--violet)", tags: ["services/chat_history.py"], details: "会话列表、搜索、详情、导出、保存 exchange、生成 compact model messages、保存摘要。", facts: ["技术：SQLAlchemy relationships。", "长会话可切换到 summary_recent。", "历史会话按 user_id 过滤。"] },
+      { id: "materials-service", layer: "service", badge: "L4", x: 675, y: 496, w: 176, h: 76, title: "MaterialService", meta: "RAG pipeline", color: "var(--violet)", tags: ["services/materials.py", "vector_index.py"], details: "资料文本抽取、chunk、embedding、入库、索引重建和相似度搜索。", facts: ["技术：pypdf、zip/xml/html parser、OpenAI embeddings 或 hash embeddings。", "PersistentVectorIndex 存为 JSON 快照。", "搜索支持 user_id 和 material_ids 过滤。"] },
+      { id: "training-service", layer: "service", badge: "L4", x: 675, y: 598, w: 176, h: 76, title: "训练服务组", meta: "engine/model/bank", color: "var(--violet)", tags: ["training_engine.py", "student_model.py", "question_bank.py", "analytics.py"], details: "训练 session 编排、选题策略、判题、学生掌握度更新、题库搜索和行为分析。", facts: ["技术：SQLAlchemy ORM、策略函数。", "StudentModelService 更新 mastery。", "AnalyticsService 记录 answer/API/LLM 行为。"] },
+
+      { id: "database", layer: "data", badge: "L5", x: 890, y: 88, w: 176, h: 76, title: "关系数据库", meta: "SQLite + SQLAlchemy", color: "var(--brass)", tags: ["backend/app/models/*", "backend/tutor.db", "alembic/versions/*"], details: "默认使用 SQLite tutor.db，SQLAlchemy models 定义表，Alembic 管理迁移。核心表包括 users、refresh_tokens、students、training_sessions、questions、dashboard_tasks、pomodoro_logs、chat history、materials、user_llm_credentials。", facts: ["技术：SQLAlchemy ORM、Alembic。", "多数业务隔离字段是 users.username 字符串。", "LLM 凭证使用 users.id 外键。"] },
+      { id: "file-storage", layer: "data", badge: "L5", x: 890, y: 190, w: 176, h: 76, title: "资料文件存储", meta: "storage/materials", color: "var(--brass)", tags: ["RAG_UPLOAD_DIR", ".vector-index.json"], details: "保存用户上传的原始资料文件和本地向量索引 JSON 快照。", facts: ["技术：本地文件系统、JSON snapshot。", "文件名包含内容 hash。", "多实例部署需要共享存储或替换成对象存储/向量库。"] },
+      { id: "llm-providers", layer: "data", badge: "L5", x: 890, y: 292, w: 176, h: 76, title: "外部模型服务", meta: "OpenAI-compatible", color: "var(--brass)", tags: ["OpenAI", "DeepSeek", "Qwen", "LinkAPI", "Ollama"], details: "LLMService 通过 OpenAI-compatible 接口连接外部模型。provider registry 声明可用模型、base_url、是否需要 API Key 和 adapter 状态。", facts: ["技术：OpenAI-compatible HTTP API。", "Ollama 是 local source。", "Anthropic/Gemini 目前是 native placeholder，未实现 adapter。"] },
+      { id: "runtime-config", layer: "data", badge: "L5", x: 890, y: 394, w: 176, h: 76, title: "运行配置", meta: ".env + pydantic-settings", color: "var(--brass)", tags: ["backend/app/config.py", "frontend/.env.example", "backend/.env.example"], details: "管理数据库 URL、CORS、JWT、cookie、LLM provider、RAG、上传大小和前端 API base。", facts: ["技术：pydantic-settings、Vite env。", "当前 README、start.py、apiClient fallback、frontend env 的端口/协议需要统一。", "生产需要 HTTPS、COOKIE_SECURE、JWT_SECRET、LLM_CREDENTIAL_ENCRYPTION_KEY。"] },
+      { id: "validation", layer: "data", badge: "L5", x: 890, y: 496, w: 176, h: 76, title: "验证资产", meta: "tests + scripts", color: "var(--brass)", tags: ["backend/tests/*", "frontend/src/**/*.test.*", "scripts/test.ps1"], details: "测试和脚本不是运行时链路，但属于项目可维护性的支撑资源。覆盖认证、隔离、LLM、RAG、Dashboard、前端 API、组件和数学渲染。", facts: ["技术：unittest、Vitest、Testing Library、Playwright/MJS。", "根脚本 scripts/test.ps1 可跑整体验证。", "迁移由 Alembic revision 管理。"] }
+    ];
+
+    let links = [
+      ["browser", "api-client"], ["auth-ui", "api-client"], ["dashboard-ui", "api-client"], ["tutor-ui", "api-client"], ["settings-ui", "api-client"],
+      ["api-client", "fastapi"], ["fastapi", "auth-api"], ["fastapi", "dashboard-api"], ["fastapi", "llm-api"], ["fastapi", "materials-api"],
+      ["auth-api", "db"], ["dashboard-api", "services"], ["llm-api", "services"], ["materials-api", "services"], ["services", "db"],
+      ["materials-api", "storage"], ["llm-api", "external"], ["ops", "fastapi"], ["tests", "fastapi"], ["tests", "browser"], ["llm-api", "db"]
+    ];
+
+    links = [
+      ["ui-shell", "state-providers"], ["ui-auth", "state-providers"], ["ui-dashboard", "feature-hooks"], ["ui-tutor", "feature-hooks"], ["ui-settings", "api-wrappers"],
+      ["state-providers", "api-client"], ["feature-hooks", "api-wrappers"], ["api-wrappers", "api-client"],
+      ["api-client", "fastapi"], ["fastapi", "auth-api"], ["fastapi", "dashboard-api"], ["fastapi", "llm-api"], ["fastapi", "materials-api"], ["fastapi", "training-api"],
+      ["auth-api", "auth-service"], ["dashboard-api", "dashboard-service"], ["llm-api", "llm-service"], ["llm-api", "history-service"], ["materials-api", "materials-service"], ["training-api", "training-service"],
+      ["auth-service", "database"], ["dashboard-service", "database"], ["llm-service", "llm-providers"], ["llm-service", "database"], ["history-service", "database"], ["materials-service", "database"], ["materials-service", "file-storage"], ["training-service", "database"], ["fastapi", "runtime-config"], ["validation", "fastapi"], ["validation", "ui-shell"]
+    ];
+
+    const layerMeta = {
+      ui: { label: "L1 展示层", caption: "React TSX 页面/组件" },
+      adapter: { label: "L2 前端适配层", caption: "Context、Query、API wrapper" },
+      api: { label: "L3 后端 API 层", caption: "FastAPI routers" },
+      service: { label: "L4 后端服务层", caption: "业务编排与领域逻辑" },
+      data: { label: "L5 数据与外部资源层", caption: "DB、文件、模型、配置、验证" }
+    };
+
+    const flows = {
+      auth: {
+        label: "认证",
+        steps: [
+          ["注册/登录", "Login/Register 页面调用 AuthContext，AuthContext 通过 apiClient 请求 /api/auth/register 或 /api/auth/login。"],
+          ["签发凭证", "后端校验用户和密码，返回 access_token，并通过 httpOnly cookie 设置 refresh_token。"],
+          ["业务请求", "apiClient 在 Authorization 中带 Bearer access token，同时 credentials: include 允许 cookie 跟随。"],
+          ["刷新重放", "业务请求遇到 401 且不是 auth 路径时，apiClient 单飞调用 /api/auth/refresh，成功后重放原请求。"],
+          ["隔离边界", "get_current_user 返回 User，业务路由使用 current_user.username 过滤 Dashboard、聊天、资料和学生数据。"]
+        ]
+      },
+      chat: {
+        label: "Tutor Chat",
+        steps: [
+          ["构造上下文", "useTutorChat 把消息、训练模式、番茄钟状态、学习阶段、承接摘要、material_ids 组装成 TutorChatRequest。"],
+          ["材料检索", "后端 /api/llm/chat 根据最后一条 user message 和 material_ids 调 MaterialService.search_materials。"],
+          ["历史压缩", "ChatHistoryService 在长会话中返回 summary + recent messages，context_policy 变为 summary_recent。"],
+          ["provider 解析", "LLMCredentialResolver 优先用户默认 credential，再考虑全局 fallback 或 Ollama。"],
+          ["调用模型并落库", "LLMService.complete_chat 构造 prompt 和 OpenAI-compatible client，成功后保存 user/assistant exchange 并返回完整 conversation。"]
+        ]
+      },
+      rag: {
+        label: "资料/RAG",
+        steps: [
+          ["上传文件", "Tutor 资料面板通过 apiUpload 调 /api/materials/upload，后端按 current_user.username 归属资料。"],
+          ["文本抽取", "MaterialService 根据扩展名处理 txt、md、docx、pdf、epub，标准化文本并按 chunk_size/overlap 切块。"],
+          ["Embedding", "有 OPENAI_API_KEY 时用 OpenAI embedding，否则使用 HashEmbeddingProvider，保证本地和测试可运行。"],
+          ["持久化索引", "StudyMaterial 和 StudyMaterialChunk 入库后重建 .vector-index.json。"],
+          ["聊天注入", "聊天前按问题检索 top_k chunk，将 material_context 注入 tutor_context 和响应。"]
+        ]
+      },
+      dashboard: {
+        label: "Dashboard",
+        steps: [
+          ["加载 summary", "DashboardPage 用 React Query 拉 /api/dashboard/summary。"],
+          ["任务操作", "TodayPlan 通过 dashboardApi 创建、更新、删除任务，后端 DashboardService 按 user_id 过滤。"],
+          ["专注记录", "Pomodoro 完成后调用 /api/dashboard/pomodoro 记录 PomodoroLog。"],
+          ["聚合统计", "DashboardService 聚合 PomodoroLog、DashboardTask、TrainingSession、StudentAnswer、TutorConversation。"],
+          ["刷新视图", "前端在任务或番茄钟变更后 invalidate dashboard summary query。"]
+        ]
+      },
+      training: {
+        label: "训练引擎",
+        steps: [
+          ["创建 session", "training API 创建 TrainingSession，并通过 StudentModelService 获取推荐技能和掌握度。"],
+          ["选下一题", "TrainingEngine 根据番茄钟剩余时间、近期答题和策略，从 QuestionBankService 搜索候选题。"],
+          ["提交答案", "submit_answer 判题，更新 session 统计、SessionQuestion 和 StudentAnswer。"],
+          ["更新画像", "StudentModelService 根据答题正确性、耗时和 hint_count 更新 StudentMastery。"],
+          ["分析补充", "AnalyticsService 可记录答案、问题统计、技能统计和 LLM 调用。"]
+        ]
+      }
+    };
+
+    const svg = document.getElementById("architectureMap");
+    const detailPanel = document.getElementById("detailPanel");
+    const searchInput = document.getElementById("searchInput");
+    const layerFilter = document.getElementById("layerFilter");
+    const resetView = document.getElementById("resetView");
+    const flowTabs = document.getElementById("flowTabs");
+    const flowBody = document.getElementById("flowBody");
+    let selectedNode = "llm-api";
+    let activeLayer = "all";
+
+    function center(node) {
+      return { x: node.x + node.w / 2, y: node.y + node.h / 2 };
+    }
+
+    function colorFor(layer) {
+      return layer === "ui" ? "var(--mint)" : layer === "adapter" ? "var(--blue)" : layer === "api" ? "var(--coral)" : layer === "service" ? "var(--violet)" : "var(--brass)";
+    }
+
+    function renderMap() {
+      const query = searchInput.value.trim().toLowerCase();
+      svg.innerHTML = "";
+      const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+      defs.innerHTML = '<marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto"><path d="M0,0 L8,3.5 L0,7 Z" fill="rgba(34,104,200,.48)"></path></marker>';
+      svg.appendChild(defs);
+
+      Object.entries(layerMeta).forEach(([layer, meta]) => {
+        const firstNode = nodes.find(node => node.layer === layer);
+        if (!firstNode) return;
+        const header = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        const rail = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        rail.setAttribute("x", firstNode.x);
+        rail.setAttribute("y", 18);
+        rail.setAttribute("width", firstNode.w);
+        rail.setAttribute("height", 44);
+        rail.setAttribute("rx", 8);
+        rail.setAttribute("fill", "rgba(255,255,255,.72)");
+        rail.setAttribute("stroke", colorFor(layer));
+        rail.setAttribute("stroke-opacity", ".38");
+        header.appendChild(rail);
+
+        const title = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        title.setAttribute("x", firstNode.x + 12);
+        title.setAttribute("y", 36);
+        title.setAttribute("class", "node-title");
+        title.textContent = meta.label;
+        header.appendChild(title);
+
+        const caption = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        caption.setAttribute("x", firstNode.x + 12);
+        caption.setAttribute("y", 53);
+        caption.setAttribute("class", "node-meta");
+        caption.textContent = meta.caption;
+        header.appendChild(caption);
+        svg.appendChild(header);
+      });
+
+      links.forEach(([fromId, toId]) => {
+        const from = nodes.find(n => n.id === fromId);
+        const to = nodes.find(n => n.id === toId);
+        const a = center(from);
+        const b = center(to);
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        const midX = (a.x + b.x) / 2;
+        path.setAttribute("d", `M ${a.x} ${a.y} C ${midX} ${a.y}, ${midX} ${b.y}, ${b.x} ${b.y}`);
+        path.setAttribute("class", `link ${fromId === selectedNode || toId === selectedNode ? "active" : ""}`);
+        path.setAttribute("marker-end", "url(#arrow)");
+        svg.appendChild(path);
+      });
+
+      nodes.forEach(node => {
+        const textBlob = `${node.title} ${node.meta} ${node.tags.join(" ")} ${node.details}`.toLowerCase();
+        const matchesSearch = !query || textBlob.includes(query);
+        const matchesLayer = activeLayer === "all" || node.layer === activeLayer;
+        const dimmed = !matchesSearch || !matchesLayer;
+        const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        group.setAttribute("class", `node-card ${node.id === selectedNode ? "active" : ""} ${dimmed ? "dimmed" : ""}`);
+        group.setAttribute("tabindex", "0");
+        group.setAttribute("role", "button");
+        group.setAttribute("aria-label", node.title);
+        group.addEventListener("click", () => selectNode(node.id));
+        group.addEventListener("keydown", event => {
+          if (event.key === "Enter" || event.key === " ") selectNode(node.id);
+        });
+
+        const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        rect.setAttribute("x", node.x);
+        rect.setAttribute("y", node.y);
+        rect.setAttribute("width", node.w);
+        rect.setAttribute("height", node.h);
+        group.appendChild(rect);
+
+        const stripe = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        stripe.setAttribute("x", node.x);
+        stripe.setAttribute("y", node.y);
+        stripe.setAttribute("width", 6);
+        stripe.setAttribute("height", node.h);
+        stripe.setAttribute("rx", 4);
+        stripe.setAttribute("fill", colorFor(node.layer));
+        group.appendChild(stripe);
+
+        const title = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        title.setAttribute("x", node.x + 18);
+        title.setAttribute("y", node.y + 29);
+        title.setAttribute("class", "node-title");
+        title.textContent = node.title;
+        group.appendChild(title);
+
+        const meta = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        meta.setAttribute("x", node.x + 18);
+        meta.setAttribute("y", node.y + 51);
+        meta.setAttribute("class", "node-meta");
+        meta.textContent = node.meta;
+        group.appendChild(meta);
+
+        const badge = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        badge.setAttribute("x", node.x + node.w - 58);
+        badge.setAttribute("y", node.y + node.h - 24);
+        badge.setAttribute("width", 42);
+        badge.setAttribute("height", 16);
+        badge.setAttribute("rx", 8);
+        badge.setAttribute("fill", node.color);
+        group.appendChild(badge);
+
+        const badgeText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        badgeText.setAttribute("x", node.x + node.w - 37);
+        badgeText.setAttribute("y", node.y + node.h - 12);
+        badgeText.setAttribute("text-anchor", "middle");
+        badgeText.setAttribute("class", "node-badge");
+        badgeText.textContent = node.badge || node.layer;
+        group.appendChild(badgeText);
+        svg.appendChild(group);
+      });
+    }
+
+    function selectNode(id) {
+      selectedNode = id;
+      const node = nodes.find(item => item.id === id);
+      detailPanel.innerHTML = `
+        <h2>${node.title}</h2>
+        <p>${node.details}</p>
+        <div class="chips">${node.tags.map(tag => `<span class="chip">${tag}</span>`).join("")}</div>
+        <div class="detail-list">${node.facts.map(fact => `<div class="fact">${fact}</div>`).join("")}</div>
+      `;
+      renderMap();
+    }
+
+    function renderFlows(active = "chat") {
+      flowTabs.innerHTML = Object.entries(flows).map(([id, flow]) => (
+        `<button class="${id === active ? "active" : ""}" data-flow="${id}">${flow.label}</button>`
+      )).join("");
+      flowBody.innerHTML = flows[active].steps.map((step, index) => `
+        <div class="flow-line">
+          <div class="flow-number">${index + 1}</div>
+          <div><strong>${step[0]}</strong><span>${step[1]}</span></div>
+        </div>
+      `).join("");
+      flowTabs.querySelectorAll("button").forEach(button => {
+        button.addEventListener("click", () => renderFlows(button.dataset.flow));
+      });
+    }
+
+    searchInput.addEventListener("input", renderMap);
+    layerFilter.querySelectorAll("button").forEach(button => {
+      button.addEventListener("click", () => {
+        activeLayer = button.dataset.layer;
+        layerFilter.querySelectorAll("button").forEach(item => item.classList.toggle("active", item === button));
+        renderMap();
+      });
+    });
+    resetView.addEventListener("click", () => {
+      activeLayer = "all";
+      selectedNode = "llm-api";
+      searchInput.value = "";
+      layerFilter.querySelectorAll("button").forEach(button => button.classList.toggle("active", button.dataset.layer === "all"));
+      selectNode(selectedNode);
+    });
+
+    renderFlows();
+    selectNode(selectedNode);
+  </script>
+</body>
+</html>

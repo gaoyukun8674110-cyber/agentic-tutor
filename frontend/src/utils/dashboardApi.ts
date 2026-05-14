@@ -48,47 +48,41 @@ export interface DashboardSummary {
   calendar_events: DashboardCalendarEvent[];
 }
 
-export async function fetchDashboardSummary(userId = 'local', options?: ApiRequestOptions): Promise<DashboardSummary> {
-  return apiFetch<DashboardSummary>(`/api/dashboard/summary?user_id=${encodeURIComponent(userId)}`, options);
+export async function fetchDashboardSummary(options?: ApiRequestOptions): Promise<DashboardSummary> {
+  return apiFetch<DashboardSummary>('/api/dashboard/summary', options);
 }
 
 export async function createDashboardTask(
   task: Pick<DashboardTask, 'subject' | 'task' | 'duration' | 'priority'> & {
-    user_id?: string;
     scheduled_date?: string;
   },
 ): Promise<DashboardTask> {
-  const user_id = task.user_id ?? 'local';
   return apiFetch<DashboardTask>('/api/dashboard/tasks', {
     method: 'POST',
-    body: JSON.stringify({ ...task, user_id }),
+    body: JSON.stringify(task),
   });
 }
 
 export async function updateDashboardTask(
   taskId: number,
-  update: Partial<Pick<DashboardTask, 'subject' | 'task' | 'duration' | 'priority' | 'completed' | 'scheduled_date'>> & {
-    user_id?: string;
-  },
+  update: Partial<Pick<DashboardTask, 'subject' | 'task' | 'duration' | 'priority' | 'completed' | 'scheduled_date'>>,
 ): Promise<DashboardTask> {
-  const user_id = update.user_id ?? 'local';
   return apiFetch<DashboardTask>(`/api/dashboard/tasks/${taskId}`, {
     method: 'PATCH',
-    body: JSON.stringify({ ...update, user_id }),
+    body: JSON.stringify(update),
   });
 }
 
-export async function deleteDashboardTask(taskId: number, userId = 'local'): Promise<void> {
-  await apiFetch<{ deleted: boolean }>(`/api/dashboard/tasks/${taskId}?user_id=${encodeURIComponent(userId)}`, {
+export async function deleteDashboardTask(taskId: number): Promise<void> {
+  await apiFetch<{ deleted: boolean }>(`/api/dashboard/tasks/${taskId}`, {
     method: 'DELETE',
   });
 }
 
-export async function logDashboardPomodoro(durationMinutes: number, mode = 'work', userId = 'local'): Promise<void> {
+export async function logDashboardPomodoro(durationMinutes: number, mode = 'work'): Promise<void> {
   await apiFetch('/api/dashboard/pomodoro', {
     method: 'POST',
     body: JSON.stringify({
-      user_id: userId,
       mode,
       duration_minutes: durationMinutes,
     }),

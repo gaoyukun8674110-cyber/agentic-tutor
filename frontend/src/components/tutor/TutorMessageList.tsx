@@ -17,6 +17,12 @@ interface TutorMessageListProps {
 
 export function TutorMessageList({ messages, materialContext, isSending, language, tokens, t }: TutorMessageListProps) {
   const chunks = materialContext?.chunks ?? [];
+  const credentialLabel = (message: ChatMessage) => {
+    if (message.credentialSource === 'user') return t('你的 Key', 'Your key');
+    if (message.credentialSource === 'global') return t('Demo Key', 'Demo key');
+    if (message.credentialSource === 'local') return t('本地 Ollama', 'Local Ollama');
+    return null;
+  };
 
   return (
     <div className="space-y-6 py-8" style={{ maxWidth: 820, margin: '0 auto' }}>
@@ -37,9 +43,17 @@ export function TutorMessageList({ messages, materialContext, isSending, languag
                 marginRight: isUser ? 0 : 'auto',
               }}
             >
-              {message.label && !isUser && (
-                <div className="mb-2 text-xs font-medium" style={{ color: tokens.textSecondary }}>
-                  {message.label}
+              {(message.label || message.credentialSource) && !isUser && (
+                <div className="mb-2 flex flex-wrap items-center gap-2 text-xs font-medium" style={{ color: tokens.textSecondary }}>
+                  {message.label && <span>{message.label}</span>}
+                  {credentialLabel(message) && (
+                    <span
+                      className="rounded-full border px-2 py-0.5"
+                      style={{ borderColor: 'var(--ai-border-subtle)', background: tokens.surfaceMuted }}
+                    >
+                      {credentialLabel(message)}
+                    </span>
+                  )}
                 </div>
               )}
               <MathMessage content={message.content} isUser={isUser} />

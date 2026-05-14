@@ -4,33 +4,45 @@ from unittest.mock import patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from app.api.deps import get_current_user
 from app.api.llm import router as llm_router
+from app.models.user import User
 
 
-AUTH_HEADERS = {"X-API-Key": "local-dev-key"}
+def fake_user() -> User:
+    return User(id=1, username="alice", email=None, is_active=True, created_at="now", updated_at="now")
 
 
 class ApiAuthTests(unittest.TestCase):
     def setUp(self):
         app = FastAPI()
+        app.dependency_overrides[get_current_user] = fake_user
         app.include_router(llm_router)
         self.client = TestClient(app)
 
-    def test_api_requires_x_api_key_header(self):
-        response = self.client.get("/api/llm/providers")
+    def test_api_requires_bearer_access_token(self):
+        app = FastAPI()
+        app.include_router(llm_router)
+        client = TestClient(app)
+
+        response = client.get("/api/llm/providers")
 
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json()["detail"]["code"], "unauthorized")
-        self.assertEqual(response.json()["detail"]["user_message"], "Missing X-API-Key header")
+        self.assertEqual(response.json()["detail"]["user_message"], "Missing access token")
 
-    def test_api_rejects_invalid_x_api_key_header(self):
-        response = self.client.get("/api/llm/providers", headers={"X-API-Key": "wrong"})
+    def test_api_rejects_invalid_bearer_token(self):
+        app = FastAPI()
+        app.include_router(llm_router)
+        client = TestClient(app)
 
-        self.assertEqual(response.status_code, 403)
-        self.assertEqual(response.json()["detail"]["code"], "forbidden")
+        response = client.get("/api/llm/providers", headers={"Authorization": "Bearer wrong"})
 
-    def test_api_accepts_configured_x_api_key_header(self):
-        response = self.client.get("/api/llm/providers", headers=AUTH_HEADERS)
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()["detail"]["code"], "invalid_token")
+
+    def test_api_accepts_authenticated_user_dependency(self):
+        response = self.client.get("/api/llm/providers")
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("providers", response.json())
@@ -46,12 +58,13 @@ class ApiAuthTests(unittest.TestCase):
                 return {"providers": []}
 
         app = FastAPI()
+        app.dependency_overrides[get_current_user] = fake_user
         app.include_router(llm_router)
 
         with patch("app.api.llm.LLMService", FakeLLMService):
             client = TestClient(app)
-            response_one = client.get("/api/llm/providers", headers=AUTH_HEADERS)
-            response_two = client.get("/api/llm/providers", headers=AUTH_HEADERS)
+            response_one = client.get("/api/llm/providers")
+            response_two = client.get("/api/llm/providers")
 
         self.assertEqual(response_one.status_code, 200)
         self.assertEqual(response_two.status_code, 200)

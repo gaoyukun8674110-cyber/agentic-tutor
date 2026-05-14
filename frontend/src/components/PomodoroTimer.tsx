@@ -26,21 +26,18 @@ const modeCopy = {
     zh: '专注',
     en: 'Focus',
     icon: Brain,
-    color: '#ef4444',
   },
   shortBreak: {
     zh: '短休息',
     en: 'Short break',
     icon: Coffee,
-    color: '#10b981',
   },
   longBreak: {
     zh: '长休息',
     en: 'Long break',
     icon: Target,
-    color: '#3b82f6',
   },
-} satisfies Record<TimerMode, { zh: string; en: string; icon: typeof Brain; color: string }>;
+} satisfies Record<TimerMode, { zh: string; en: string; icon: typeof Brain }>;
 
 export function PomodoroTimer({
   onStatsChange,
@@ -96,13 +93,15 @@ export function PomodoroTimer({
   const progress = currentDuration > 0 ? ((currentDuration - state.remainingSeconds) / currentDuration) * 100 : 0;
   const currentConfig = modeCopy[state.mode];
   const Icon = currentConfig.icon;
+  const modeColor =
+    state.mode === 'work' ? tokens.accentSecondary : state.mode === 'shortBreak' ? tokens.success : tokens.accentPrimary;
   const displayedCompletedPomodoros = Math.max(persistedCompletedPomodoros ?? 0, state.completedPomodoros);
   const displayedFocusMinutes = Math.max(persistedFocusMinutes ?? 0, state.focusMinutes);
 
   const cardStyle = cardSurfaceStyle(tokens);
 
   const headerStyle = {
-    background: `linear-gradient(135deg, ${currentConfig.color}25, ${currentConfig.color}05)`,
+    background: state.mode === 'work' ? tokens.accentSecondarySoft : state.mode === 'shortBreak' ? tokens.successSoft : tokens.accentPrimarySoft,
     backdropFilter: 'blur(14px)',
     borderBottom: tokens.borderSoft,
   };
@@ -115,9 +114,9 @@ export function PomodoroTimer({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="rounded-xl p-2" style={controlStyle}>
-              <Icon className="h-5 w-5" style={{ color: currentConfig.color }} />
+              <Icon className="h-5 w-5" style={{ color: modeColor }} />
             </div>
-            <h2 className="text-lg font-medium" style={{ color: currentConfig.color }}>
+            <h2 className="text-lg font-medium" style={{ color: modeColor }}>
               {t('番茄钟', 'Pomodoro')}
             </h2>
           </div>
@@ -210,7 +209,14 @@ export function PomodoroTimer({
               style={{
                 border: state.mode === item ? tokens.borderStrong : tokens.borderSoft,
                 background: state.mode === item ? tokens.surface : tokens.surfaceMuted,
-                color: state.mode === item ? modeCopy[item].color : tokens.textSecondary,
+                color:
+                  state.mode === item
+                    ? item === 'work'
+                      ? tokens.accentSecondary
+                      : item === 'shortBreak'
+                        ? tokens.success
+                        : tokens.accentPrimary
+                    : tokens.textSecondary,
               }}
             >
               {modeCopy[item][language]}
@@ -242,7 +248,7 @@ export function PomodoroTimer({
                 className="transition-all"
                 style={{
                   transition: 'stroke-dashoffset 1s linear',
-                  stroke: currentConfig.color,
+                  stroke: modeColor,
                   filter: 'drop-shadow(0 0 8px currentColor)',
                 }}
               />
@@ -262,10 +268,11 @@ export function PomodoroTimer({
         <div className="flex gap-3">
           <button
             onClick={toggleTimer}
-            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r py-3 font-medium text-white transition-all"
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r py-3 font-medium transition-all"
             style={{
-              background: `linear-gradient(135deg, ${currentConfig.color}cc, ${currentConfig.color}99)`,
+              background: state.mode === 'work' ? tokens.primaryActionGradient : modeColor,
               border: tokens.borderSoft,
+              color: tokens.textInverted,
             }}
           >
             {state.isRunning ? (
@@ -289,7 +296,7 @@ export function PomodoroTimer({
           className="mt-4 rounded-2xl p-3"
           style={{
             ...controlStyle,
-            background: `linear-gradient(135deg, ${currentConfig.color}15, ${currentConfig.color}05)`,
+            background: state.mode === 'work' ? tokens.accentSecondarySoft : state.mode === 'shortBreak' ? tokens.successSoft : tokens.accentPrimarySoft,
           }}
         >
           <p className="text-center text-sm tabular-nums" style={{ color: tokens.textSecondary }}>

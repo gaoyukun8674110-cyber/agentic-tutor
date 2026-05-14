@@ -19,6 +19,7 @@ Start the backend:
 cd backend
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m alembic upgrade head
 .\.venv\Scripts\python.exe start.py
 ```
 
@@ -35,7 +36,8 @@ Defaults:
 - Backend: `http://localhost:8000`
 - Frontend: `http://localhost:4173`
 - Frontend API base: `VITE_API_BASE_URL`, defaulting to `http://localhost:8000`
-- Local API key: `VITE_API_KEY` / backend `API_KEYS`, defaulting to `local-dev-key`
+- Demo login after `alembic upgrade head`: `test-01` / `123456`
+- Auth transport: short-lived JWT access tokens in `Authorization: Bearer ...`, plus an HttpOnly refresh cookie scoped to `/api/auth`.
 
 ## Validation
 
@@ -43,6 +45,7 @@ Backend:
 
 ```powershell
 cd backend
+.\.venv\Scripts\python.exe -m compileall app tests
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
@@ -51,6 +54,8 @@ Frontend:
 ```powershell
 cd frontend
 npm run type-check
+npm run lint
+npm run test:run
 npm run build
 ```
 

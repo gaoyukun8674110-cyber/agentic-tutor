@@ -14,4 +14,7 @@ pypdf==5.1.0
 aiosqlite==0.19.0
 httpx==0.25.2
 loguru==0.7.2
+passlib[argon2]==1.7.4
+PyJWT==2.12.1
+cryptography==42.0.8
 

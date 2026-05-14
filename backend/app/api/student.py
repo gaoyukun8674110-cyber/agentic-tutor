@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from app.api.deps import get_current_user, require_matching_user
 from app.database import get_db
+from app.models.user import User
 from app.services.student_model import StudentModelService
 from app.services.pomodoro import PomodoroService
 
@@ -14,7 +15,7 @@ router = APIRouter(prefix="/api/student", tags=["student"], dependencies=[Depend
 def get_mastery(
     user_id: str,
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """获取掌握度"""
     require_matching_user(user_id, current_user)
@@ -44,7 +45,7 @@ def get_recommendations(
     user_id: str,
     target_skills: str = None,
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """获取推荐出题范围"""
     require_matching_user(user_id, current_user)
@@ -62,7 +63,7 @@ def get_recommendations(
 def get_learning_report(
     user_id: str,
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """获取学习报告"""
     require_matching_user(user_id, current_user)
@@ -79,7 +80,7 @@ def get_review_plan(
     user_id: str,
     days_ahead: int = 7,
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """获取复习计划"""
     require_matching_user(user_id, current_user)

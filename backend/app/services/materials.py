@@ -13,7 +13,7 @@ from typing import Any, Protocol
 from xml.etree import ElementTree
 
 from openai import OpenAI
-from sqlalchemy import func, or_
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -391,18 +391,13 @@ class MaterialService:
         top_k = max(1, min(top_k or settings.RAG_TOP_K, 10))
         query_vector = self.embedding_provider.embed(cleaned_query)
         snapshot = self._load_or_rebuild_vector_index()
-        search_user_id = user_id
-        allowed_user_ids: set[str | None] | None = None
-        if user_id == settings.DEFAULT_AUTH_USER_ID:
-            search_user_id = None
-            allowed_user_ids = {user_id, None}
         chunk_scores = search_snapshot(
             snapshot,
             query_vector=query_vector,
             top_k=top_k,
-            user_id=search_user_id,
+            user_id=user_id,
             material_ids=set(material_ids) if material_ids else None,
-            allowed_user_ids=allowed_user_ids,
+            allowed_user_ids=None,
         )
         if not chunk_scores:
             return []
@@ -434,8 +429,6 @@ class MaterialService:
         ]
 
     def _user_scope_filter(self, user_id: str):
-        if user_id == settings.DEFAULT_AUTH_USER_ID:
-            return or_(StudyMaterial.user_id == user_id, StudyMaterial.user_id.is_(None))
         return StudyMaterial.user_id == user_id
 
     def _ready_chunk_stats(self) -> tuple[int, int]:

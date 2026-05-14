@@ -39,6 +39,12 @@ class Settings(BaseSettings):
     OLLAMA_BASE_URL: str = "http://localhost:11434/v1"
     OLLAMA_MODEL: str = "llama3.1"
 
+    # Per-user LLM credentials
+    LLM_CREDENTIAL_ENCRYPTION_KEY: Optional[str] = None
+    LLM_CREDENTIAL_PREVIOUS_KEYS: str = ""
+    LLM_FINGERPRINT_HMAC_KEY: Optional[str] = None
+    ALLOW_GLOBAL_LLM_FALLBACK: bool = True
+
     # Native provider placeholders for the next adapter iteration
     ANTHROPIC_API_KEY: Optional[str] = None
     ANTHROPIC_MODEL: str = "claude-3-5-sonnet-latest"
@@ -55,9 +61,19 @@ class Settings(BaseSettings):
         "http://127.0.0.1:4173",
         "http://127.0.0.1:5173",
     ]
-    API_KEYS: list[str] = ["local-dev-key"]
-    DEFAULT_AUTH_USER_ID: str = "local"
     MAX_UPLOAD_SIZE_MB: int = 25
+
+    # Auth
+    JWT_SECRET: str = "dev-only-change-me-dev-only-change-me"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_TTL_SECONDS: int = 900
+    REFRESH_TOKEN_TTL_SECONDS: int = 60 * 60 * 24 * 30
+    PASSWORD_MIN_LENGTH: int = 8
+    PASSWORD_MAX_LENGTH: int = 128
+    COOKIE_REFRESH_NAME: str = "refresh_token"
+    COOKIE_REFRESH_PATH: str = "/api/auth"
+    COOKIE_SAMESITE: str = "lax"
+    COOKIE_SECURE: bool = False
     
     # 番茄钟
     DEFAULT_POMODORO_DURATION: int = 25  # 分钟

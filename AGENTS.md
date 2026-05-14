@@ -11,6 +11,7 @@
 ## Backend
 
 - Install: `cd backend; pip install -r requirements.txt`
+- Migrate: `cd backend; python -m alembic upgrade head`
 - Run: `cd backend; python start.py`
 - Validate imports: `cd backend; python -m compileall app tests`
 - Unit tests: `cd backend; python -m unittest discover -s tests -v`
@@ -26,7 +27,8 @@
 ## Operational Notes
 
 - API keys must stay in backend `.env` files, never in frontend code.
-- Browser calls must go through `frontend/src/utils/apiClient.ts`.
+- Browser calls must go through `frontend/src/utils/apiClient.ts`; app auth uses bearer access tokens plus the HttpOnly `/api/auth` refresh cookie, not `X-API-Key`.
+- Local/demo migrations create `test-01 / 123456`; production operators must replace or disable that default before exposing a deployment.
 - The frontend defaults to `http://localhost:8001`, matching `backend/start.py`; the backend defaults to allowing `http://localhost:4173`.
 - Keep backend and frontend API contract changes in the same commit when they depend on each other.
 - Do not commit local databases, uploaded materials, virtual environments, dependency directories, or build output.

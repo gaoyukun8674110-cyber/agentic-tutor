@@ -1,5 +1,5 @@
 """Dashboard persistence models."""
-from sqlalchemy import Boolean, Column, Integer, String
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
 
 from app.database import Base
 
@@ -10,7 +10,7 @@ class DashboardTask(Base):
     __tablename__ = "dashboard_tasks"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String(100), nullable=False, index=True)
+    user_id = Column(String(100), ForeignKey("users.username", ondelete="CASCADE"), nullable=False, index=True)
     subject = Column(String(120), nullable=False)
     task = Column(String(500), nullable=False)
     duration = Column(Integer, default=25, nullable=False)
@@ -28,7 +28,7 @@ class PomodoroLog(Base):
     __tablename__ = "pomodoro_logs"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String(100), nullable=False, index=True)
+    user_id = Column(String(100), ForeignKey("users.username", ondelete="CASCADE"), nullable=False, index=True)
     mode = Column(String(30), nullable=False)
     duration_minutes = Column(Integer, nullable=False)
     completed_at = Column(String(50), nullable=False, index=True)

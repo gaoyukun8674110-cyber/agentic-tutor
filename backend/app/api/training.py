@@ -5,6 +5,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 from app.api.deps import get_current_user
 from app.database import get_db
+from app.models.user import User
 from app.services.training_engine import TrainingEngine
 from app.services.analytics import AnalyticsService
 from app.models.session import LearningGoal
@@ -13,7 +14,6 @@ router = APIRouter(prefix="/api/training", tags=["training"], dependencies=[Depe
 
 
 class SessionCreate(BaseModel):
-    user_id: str
     target_skills: Optional[List[str]] = None
     target_chapter: Optional[str] = None
     learning_goal: str = "consolidation"
@@ -30,7 +30,7 @@ class AnswerSubmit(BaseModel):
 def create_session(
     session_data: SessionCreate,
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """创建训练 Session"""
     engine = TrainingEngine(db)
@@ -39,7 +39,7 @@ def create_session(
     # 获取或创建学生
     from app.services.student_model import StudentModelService
     student_service = StudentModelService(db)
-    student = student_service.get_or_create_student(current_user)
+    student = student_service.get_or_create_student(current_user.username)
     
     try:
         session = engine.create_session(
@@ -53,7 +53,7 @@ def create_session(
         analytics.log_behavior(
             log_type="session",
             action="create_session",
-            user_id=current_user,
+            user_id=current_user.username,
             session_id=session.id,
         )
         

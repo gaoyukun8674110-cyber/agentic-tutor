@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.config import settings
 from app.database import get_db
+from app.models.user import User
 from app.services.materials import SUPPORTED_EXTENSIONS, MaterialService
 from app.utils.errors import api_error
 from app.utils.upload import max_upload_bytes, read_validated_upload
@@ -28,7 +29,7 @@ async def upload_material(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Upload one learning material and make it searchable."""
     content_length = request.headers.get("content-length")
@@ -42,7 +43,7 @@ async def upload_material(
             filename=file.filename or "material",
             content=content,
             content_type=file.content_type,
-            user_id=current_user,
+            user_id=current_user.username,
         )
         background_tasks.add_task(service.fill_material_embeddings, int(material["id"]))
         return material
@@ -53,12 +54,12 @@ async def upload_material(
 @router.get("", response_model=dict)
 def list_materials(
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """List uploaded learning materials."""
     service = MaterialService(db)
     return {
-        "materials": service.list_materials(user_id=current_user),
+        "materials": service.list_materials(user_id=current_user.username),
         "supported_extensions": sorted(SUPPORTED_EXTENSIONS),
     }
 
@@ -67,13 +68,13 @@ def list_materials(
 def search_materials(
     request: MaterialSearchRequest,
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Search uploaded learning materials for Tutor context."""
     service = MaterialService(db)
     chunks: list[dict[str, Any]] = service.search_materials(
         query=request.query,
-        user_id=current_user,
+        user_id=current_user.username,
         material_ids=request.material_ids,
         top_k=request.top_k,
     )

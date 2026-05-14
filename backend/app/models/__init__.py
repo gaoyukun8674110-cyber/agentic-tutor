@@ -6,6 +6,8 @@ from app.models.analytics import BehaviorLog, QuestionStat, SkillStat
 from app.models.chat_history import TutorConversation, TutorConversationDigest, TutorConversationMessage
 from app.models.dashboard import DashboardTask, PomodoroLog
 from app.models.materials import StudyMaterial, StudyMaterialChunk
+from app.models.llm_credentials import UserLLMCredential
+from app.models.user import RefreshToken, User
 
 __all__ = [
     "Question",
@@ -26,5 +28,8 @@ __all__ = [
     "PomodoroLog",
     "StudyMaterial",
     "StudyMaterialChunk",
+    "UserLLMCredential",
+    "User",
+    "RefreshToken",
 ]
 

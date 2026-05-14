@@ -240,7 +240,7 @@ class MaterialRagTests(unittest.TestCase):
         finally:
             db.close()
 
-    def test_default_local_user_can_read_legacy_userless_materials(self):
+    def test_material_search_is_scoped_to_current_user(self):
         db = self.SessionLocal()
         try:
             with tempfile.TemporaryDirectory() as tmpdir:
@@ -251,23 +251,29 @@ class MaterialRagTests(unittest.TestCase):
                     chunk_size=200,
                     chunk_overlap=20,
                 )
-                material = service.create_material_from_bytes(
-                    filename="legacy-statistics.txt",
+                alice_material = service.create_material_from_bytes(
+                    filename="alice-statistics.txt",
                     content=b"Bayes theorem uses posterior probability and prior probability.",
                     content_type="text/plain",
-                    user_id=None,
+                    user_id="alice",
+                )
+                service.create_material_from_bytes(
+                    filename="bob-statistics.txt",
+                    content=b"Bob also studies posterior probability.",
+                    content_type="text/plain",
+                    user_id="bob",
                 )
 
-                listed = service.list_materials(user_id="local")
+                listed = service.list_materials(user_id="alice")
                 results = service.search_materials(
                     query="posterior probability",
-                    user_id="local",
+                    user_id="alice",
                     top_k=2,
                 )
 
-            self.assertEqual([item["id"] for item in listed], [material["id"]])
+            self.assertEqual([item["id"] for item in listed], [alice_material["id"]])
             self.assertEqual(len(results), 1)
-            self.assertEqual(results[0]["material_id"], material["id"])
+            self.assertEqual(results[0]["material_id"], alice_material["id"])
         finally:
             db.close()
 

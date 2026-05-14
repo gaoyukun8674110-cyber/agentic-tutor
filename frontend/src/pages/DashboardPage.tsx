@@ -8,6 +8,7 @@ import { StudyStats } from '../components/StudyStats';
 import { TodayPlan } from '../components/TodayPlan';
 import { TopNavbar } from '../components/TopNavbar';
 import { Button } from '../components/ui/button';
+import { useAuth } from '../auth/AuthContext';
 import { fetchDashboardSummary } from '../utils/dashboardApi';
 import { cardSurfaceStyle, primaryActionStyle } from '../utils/glassStyles';
 import { useSettings } from '../utils/settings';
@@ -18,21 +19,21 @@ interface StatCard {
   value: string;
 }
 
-const DASHBOARD_USER_ID = 'local';
-
 export function DashboardPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { language, tokens, textStyle, t } = useSettings();
   const queryClient = useQueryClient();
   const { data: dashboardSummary } = useQuery({
-    queryKey: ['dashboard-summary', DASHBOARD_USER_ID],
-    queryFn: ({ signal }) => fetchDashboardSummary(DASHBOARD_USER_ID, { signal }),
+    queryKey: ['dashboard-summary', user?.username],
+    queryFn: ({ signal }) => fetchDashboardSummary({ signal }),
+    enabled: Boolean(user),
     retry: false,
   });
 
   const refreshDashboard = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: ['dashboard-summary', DASHBOARD_USER_ID] });
-  }, [queryClient]);
+    void queryClient.invalidateQueries({ queryKey: ['dashboard-summary', user?.username] });
+  }, [queryClient, user?.username]);
 
   const todayStats = dashboardSummary?.today;
   const focusMinutes = todayStats?.focus_minutes ?? 0;
@@ -66,6 +67,9 @@ export function DashboardPage() {
 
   const cardStyle = cardSurfaceStyle(tokens);
 
+  const dashboardShellClass = 'mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 xl:px-0';
+  const dashboardGridClass = 'grid grid-cols-1 items-start gap-6 lg:grid-cols-3';
+
   const renderStatCard = (item: StatCard) => {
     const Icon = item.icon;
 
@@ -93,18 +97,12 @@ export function DashboardPage() {
       <TopNavbar />
 
       <div className="relative">
-        <div className="relative mx-auto max-w-screen-2xl px-6 py-8">
-          <div className="mb-8 text-center">
-            <p className="text-lg" style={{ color: tokens.textSecondary }}>
-              {t('掌握你的学习节奏，稳步推进今天的重点。', 'Own your learning rhythm and move today forward.')}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+        <div className={dashboardShellClass}>
+          <div className={dashboardGridClass}>
             <section className="space-y-6">
               {renderStatCard(stats[0])}
               <PomodoroTimer
-                userId={DASHBOARD_USER_ID}
+                userId={user?.username ?? ''}
                 persistedCompletedPomodoros={completedPomodoros}
                 persistedFocusMinutes={focusMinutes}
                 onPomodoroLogged={refreshDashboard}
@@ -114,7 +112,6 @@ export function DashboardPage() {
             <section className="space-y-6">
               {renderStatCard(stats[1])}
               <TodayPlan
-                userId={DASHBOARD_USER_ID}
                 tasks={dashboardSummary?.tasks ?? []}
                 onDataChange={refreshDashboard}
               />
@@ -132,10 +129,10 @@ export function DashboardPage() {
             </section>
           </div>
 
-          <div className="mx-auto mt-6 max-w-7xl">
+          <div className="mt-6 w-full">
             <Button
               onClick={() => navigate('/tutor')}
-              className="w-full rounded-2xl py-6 font-medium text-white shadow-lg transition-all duration-200"
+              className="w-full rounded-2xl py-6 font-medium shadow-lg transition-all duration-200"
               style={primaryActionStyle(tokens)}
             >
               <Zap className="h-5 w-5" />
