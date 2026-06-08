@@ -92,6 +92,24 @@ class AuthApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json()["detail"]["code"], "invalid_credentials")
 
+    def test_login_rate_limits_repeated_bad_credentials_by_ip_and_username(self):
+        self.client.post("/api/auth/register", json={"username": "rateuser", "password": "password-123"})
+
+        for _ in range(5):
+            response = self.client.post(
+                "/api/auth/login",
+                json={"username": "rateuser", "password": "wrong-password"},
+            )
+            self.assertEqual(response.status_code, 401)
+
+        limited_response = self.client.post(
+            "/api/auth/login",
+            json={"username": "rateuser", "password": "wrong-password"},
+        )
+
+        self.assertEqual(limited_response.status_code, 429)
+        self.assertEqual(limited_response.json()["detail"]["code"], "rate_limited")
+
     def test_refresh_rotates_cookie_and_rejects_old_refresh_token(self):
         self.client.post("/api/auth/register", json={"username": "alice", "password": "password-123"})
         login_response = self.client.post("/api/auth/login", json={"username": "alice", "password": "password-123"})
@@ -108,7 +126,7 @@ class AuthApiTests(unittest.TestCase):
         replay_response = self.client.post("/api/auth/refresh")
 
         self.assertEqual(replay_response.status_code, 401)
-        self.assertEqual(replay_response.json()["detail"]["code"], "revoked_refresh")
+        self.assertEqual(replay_response.json()["detail"]["code"], "invalid_refresh")
 
     def test_logout_revokes_refresh_cookie_idempotently(self):
         self.client.post("/api/auth/register", json={"username": "alice", "password": "password-123"})

@@ -1,14 +1,19 @@
 """应用配置管理"""
 
+import logging
+import secrets
 from pathlib import Path
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_DATABASE_URL = f"sqlite:///{(BACKEND_DIR / 'tutor.db').as_posix()}"
+logger = logging.getLogger(__name__)
+_warned_ephemeral_jwt_secret = False
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
     """应用配置"""
 
     # 数据库
@@ -42,7 +47,7 @@ class Settings(BaseSettings):
     LLM_CREDENTIAL_ENCRYPTION_KEY: str | None = None
     LLM_CREDENTIAL_PREVIOUS_KEYS: str = ""
     LLM_FINGERPRINT_HMAC_KEY: str | None = None
-    ALLOW_GLOBAL_LLM_FALLBACK: bool = True
+    ALLOW_GLOBAL_LLM_FALLBACK: bool = False
 
     # Native provider placeholders for the next adapter iteration
     ANTHROPIC_API_KEY: str | None = None
@@ -63,7 +68,7 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE_MB: int = 25
 
     # Auth
-    JWT_SECRET: str = "dev-only-change-me-dev-only-change-me"
+    JWT_SECRET: str | None = None
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_TTL_SECONDS: int = 900
     REFRESH_TOKEN_TTL_SECONDS: int = 60 * 60 * 24 * 30
@@ -71,8 +76,8 @@ class Settings(BaseSettings):
     PASSWORD_MAX_LENGTH: int = 128
     COOKIE_REFRESH_NAME: str = "refresh_token"
     COOKIE_REFRESH_PATH: str = "/api/auth"
-    COOKIE_SAMESITE: str = "lax"
-    COOKIE_SECURE: bool = False
+    COOKIE_SAMESITE: str = "strict"
+    COOKIE_SECURE: bool | None = None
     E2E_MOCK_LLM: bool = False
 
     # 番茄钟
@@ -92,9 +97,16 @@ class Settings(BaseSettings):
     RAG_EMBEDDING_MODEL: str = "text-embedding-3-small"
     RAG_HASH_EMBEDDING_DIMENSIONS: int = 128
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    def model_post_init(self, __context: object) -> None:
+        global _warned_ephemeral_jwt_secret
+        if self.JWT_SECRET:
+            return
+        if not self.DEBUG:
+            raise RuntimeError("JWT_SECRET must be set in production")
+        self.JWT_SECRET = secrets.token_urlsafe(48)
+        if not _warned_ephemeral_jwt_secret:
+            logger.warning("JWT_SECRET is unset in DEBUG mode; generated an ephemeral in-memory secret")
+            _warned_ephemeral_jwt_secret = True
 
 
 settings = Settings()

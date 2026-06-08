@@ -98,10 +98,12 @@ class PersistentVectorIndex:
 
     def save(self, snapshot: dict) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(
+        temporary_path = self.path.with_suffix(f"{self.path.suffix}.tmp")
+        temporary_path.write_text(
             json.dumps(snapshot, ensure_ascii=False, separators=(",", ":")),
             encoding="utf-8",
         )
+        temporary_path.replace(self.path)
 
 
 def search_snapshot(

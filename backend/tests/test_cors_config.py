@@ -2,7 +2,7 @@ import unittest
 
 from fastapi.testclient import TestClient
 
-from app.main import app, build_cors_options
+from app.main import app
 
 
 class CorsConfigTests(unittest.TestCase):
@@ -36,11 +36,22 @@ class CorsConfigTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertNotEqual(response.headers.get("access-control-allow-origin"), "*")
 
-    def test_production_cors_uses_configured_origins_and_credentials(self):
-        origins, allow_credentials = build_cors_options(False, ["https://app.example.com"])
+    def test_preflight_limits_methods_and_headers_to_api_contract(self):
+        response = self.client.options(
+            "/health",
+            headers={
+                "Origin": "http://localhost:4173",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "authorization, content-type, accept-language",
+            },
+        )
 
-        self.assertEqual(origins, ["https://app.example.com"])
-        self.assertTrue(allow_credentials)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("POST", response.headers.get("access-control-allow-methods", ""))
+        allowed_headers = response.headers.get("access-control-allow-headers", "").lower()
+        self.assertIn("authorization", allowed_headers)
+        self.assertIn("content-type", allowed_headers)
+        self.assertIn("accept-language", allowed_headers)
 
 
 if __name__ == "__main__":

@@ -74,7 +74,7 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 
 Set the generated value as `LLM_CREDENTIAL_ENCRYPTION_KEY`. For key rotation, deploy the new key as `LLM_CREDENTIAL_ENCRYPTION_KEY` and move the previous active key into comma-separated `LLM_CREDENTIAL_PREVIOUS_KEYS`; old credentials remain decryptable while new writes use the new key. Set `LLM_FINGERPRINT_HMAC_KEY` to a separate random secret when possible; otherwise the app derives an HMAC secret from the encryption key.
 
-`ALLOW_GLOBAL_LLM_FALLBACK=True` keeps backend `.env` provider keys available for demo/admin fallback. Set it to `False` when users must bring their own keys.
+`ALLOW_GLOBAL_LLM_FALLBACK=False` is the default so user traffic does not silently fall back to shared backend provider keys. Only set it to `True` for an intentional local demo/admin fallback.
 
 Seed cases 位于 `evals/tutor_cases.jsonl`，覆盖：
 

@@ -149,6 +149,22 @@ class FailingOpenAIClient:
         FailingOpenAIClient.instances.append(self)
 
 
+class NoneContentCompletions(FakeCompletions):
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        return FakeCompletion(None)
+
+
+class NoneContentOpenAIClient:
+    instances = []
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+        self.chat = FakeChat()
+        self.chat.completions = NoneContentCompletions()
+        NoneContentOpenAIClient.instances.append(self)
+
+
 class LLMChatTests(unittest.TestCase):
     def setUp(self):
         FakeOpenAIClient.instances = []
@@ -359,6 +375,37 @@ class LLMChatTests(unittest.TestCase):
 
         self.assertEqual(result["error"]["code"], "llm_provider_error")
         self.assertNotIn("sk-secret", str(result))
+
+    def test_complete_chat_sets_timeout_and_normalizes_empty_provider_content(self):
+        service = LLMService()
+        resolved = SimpleNamespace(
+            provider_id="deepseek",
+            api_key="secret-deepseek",
+            base_url="https://api.deepseek.com/v1",
+            default_model="deepseek-chat",
+            source="user",
+            fingerprint="fingerprint",
+        )
+
+        with (
+            patch.object(llm_module, "OpenAI", NoneContentOpenAIClient),
+            patch.object(llm_module, "settings") as fake_settings,
+        ):
+            self._configure_fake_settings(fake_settings)
+            result = service.complete_chat(
+                resolved=resolved,
+                model=None,
+                messages=[{"role": "user", "content": "hello"}],
+                prompt_profile="socratic",
+                agent_type="tutor_chat:socratic:deepseek",
+                user_id="alice",
+                session_id=None,
+                analytics=None,
+            )
+
+        self.assertEqual(result["message"]["content"], "")
+        call = NoneContentOpenAIClient.instances[0].chat.completions.calls[0]
+        self.assertEqual(call["timeout"], 60)
 
     def test_safe_log_llm_call_uses_warning_logger_when_analytics_fails(self):
         analytics = SimpleNamespace(

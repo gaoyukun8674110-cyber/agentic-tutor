@@ -1,6 +1,7 @@
 """Dashboard API endpoints."""
 
 from datetime import date
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -12,13 +13,14 @@ from app.models.user import User
 from app.services.dashboard import DashboardService
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"], dependencies=[Depends(get_current_user)])
+TaskPriority = Literal["high", "medium", "low"]
 
 
 class DashboardTaskCreate(BaseModel):
     subject: str = "Study"
     task: str
     duration: int = Field(default=25, ge=1, le=600)
-    priority: str = "medium"
+    priority: TaskPriority = "medium"
     scheduled_date: str | None = None
 
 
@@ -26,7 +28,7 @@ class DashboardTaskUpdate(BaseModel):
     subject: str | None = None
     task: str | None = None
     duration: int | None = Field(default=None, ge=1, le=600)
-    priority: str | None = None
+    priority: TaskPriority | None = None
     completed: bool | None = None
     scheduled_date: str | None = None
 

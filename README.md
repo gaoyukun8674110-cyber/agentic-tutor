@@ -1,5 +1,7 @@
 # AI Tutor Monorepo
 
+Portfolio project: do not deploy as-is to production without replacing local demo data, secrets, and runtime settings.
+
 This repository contains the AI Tutor backend and frontend in one workspace.
 
 ## Layout
@@ -33,10 +35,10 @@ npm run dev
 
 Defaults:
 
-- Backend: `http://localhost:8000`
+- Backend: `http://localhost:8001`
 - Frontend: `http://localhost:4173`
-- Frontend API base: `VITE_API_BASE_URL`, defaulting to `http://localhost:8000`
-- Demo login after `alembic upgrade head`: `test-01` / `123456`
+- Frontend API base: `VITE_API_BASE_URL`, defaulting to `http://localhost:8001`
+- Local migrations may create a demo account for development. Replace or disable any seeded demo credentials before exposing a deployment.
 - Auth transport: short-lived JWT access tokens in `Authorization: Bearer ...`, plus an HttpOnly refresh cookie scoped to `/api/auth`.
 
 ## Validation

@@ -1,7 +1,9 @@
-import { Component, type ReactNode } from 'react';
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
+  onError?: (error: Error, info: ErrorInfo) => void;
+  onReset?: () => void;
 }
 
 interface ErrorBoundaryState {
@@ -17,11 +19,13 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     return { hasError: true };
   }
 
-  componentDidCatch(error: Error) {
-    console.error('Unhandled render error', error);
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('Unhandled render error', error, info.componentStack);
+    this.props.onError?.(error, info);
   }
 
   private handleReload = () => {
+    this.props.onReset?.();
     window.location.reload();
   };
 

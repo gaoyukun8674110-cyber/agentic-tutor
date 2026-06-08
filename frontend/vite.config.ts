@@ -27,6 +27,15 @@ function manualChunks(id: string) {
   if (mathPackages.some((segment) => id.includes(segment))) {
     return 'math-rendering';
   }
+  if (id.includes('/d3-') || id.includes('/victory-vendor/')) {
+    return 'chart-vendor';
+  }
+  if (id.includes('/recharts/')) {
+    return 'charts';
+  }
+  if (id.includes('/lucide-react/')) {
+    return 'icons';
+  }
   return undefined;
 }
 

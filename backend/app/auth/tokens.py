@@ -23,6 +23,12 @@ def iso_now() -> str:
     return utc_now().isoformat()
 
 
+def _jwt_secret() -> str:
+    if not settings.JWT_SECRET:
+        raise RuntimeError("JWT_SECRET must be configured before issuing tokens")
+    return settings.JWT_SECRET
+
+
 def encode_access_token(username: str, ttl_seconds: int | None = None) -> str:
     issued_at = utc_now()
     expires_at = issued_at + timedelta(seconds=ttl_seconds or settings.ACCESS_TOKEN_TTL_SECONDS)
@@ -32,12 +38,12 @@ def encode_access_token(username: str, ttl_seconds: int | None = None) -> str:
         "iat": int(issued_at.timestamp()),
         "exp": int(expires_at.timestamp()),
     }
-    return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+    return jwt.encode(payload, _jwt_secret(), algorithm=settings.JWT_ALGORITHM)
 
 
 def decode_access_token(token: str) -> dict[str, Any]:
     try:
-        claims = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+        claims = jwt.decode(token, _jwt_secret(), algorithms=[settings.JWT_ALGORITHM])
     except ExpiredSignatureError as exc:
         raise TokenExpiredError("Access token expired") from exc
     except JwtInvalidTokenError as exc:

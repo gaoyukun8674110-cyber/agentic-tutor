@@ -239,6 +239,7 @@ export function useTutorChat({
   }, [profiles, state.selectedProfile]);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       activeAbortControllerRef.current?.abort();
@@ -448,7 +449,6 @@ export function useTutorChat({
           messages: nextMessages,
           input: '',
           selectedProfile: resolvedProfile.id,
-          isSending: true,
           errorBanner: null,
           errorCode: null,
           activeMaterialContext: null,

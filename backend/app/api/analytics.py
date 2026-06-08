@@ -3,11 +3,11 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import require_admin
 from app.database import get_db
 from app.services.analytics import AnalyticsService
 
-router = APIRouter(prefix="/api/analytics", tags=["analytics"], dependencies=[Depends(get_current_user)])
+router = APIRouter(prefix="/api/analytics", tags=["analytics"], dependencies=[Depends(require_admin)])
 
 
 @router.get("/question/{question_id}/stats", response_model=dict)

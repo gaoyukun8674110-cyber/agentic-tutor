@@ -93,6 +93,7 @@ export interface TutorChatResponse {
   summary_generated?: boolean;
   context_policy?: 'full' | 'summary_recent' | string;
   material_context?: MaterialContext;
+  material_context_error?: string | null;
   usage?: Record<string, number | null>;
   latency_ms?: number;
   credential_source?: 'user' | 'global' | 'local';

@@ -100,4 +100,30 @@ describe('apiClient localization and auth refresh', () => {
       fetchSpy.mock.calls.filter((call) => String(call[0]).includes('/api/auth/refresh')),
     ).toHaveLength(1);
   });
+
+  it('dispatches logout and throws unauthenticated when refresh does not return a token', async () => {
+    setAccessToken('expired-token');
+    const logoutListener = vi.fn();
+    window.addEventListener('auth:logout', logoutListener);
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            detail: { code: 'token_expired', user_message: 'Access token expired' },
+          }),
+          { status: 401 },
+        ),
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ detail: 'bad refresh' }), { status: 500 }));
+
+    await expect(apiFetch<{ ok: boolean }>('/api/dashboard/summary')).rejects.toMatchObject({
+      code: 'unauthenticated',
+      status: 401,
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(logoutListener).toHaveBeenCalledTimes(1);
+    window.removeEventListener('auth:logout', logoutListener);
+  });
 });

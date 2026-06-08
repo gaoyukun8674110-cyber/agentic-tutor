@@ -12,8 +12,8 @@ export function LoginPage() {
   const { tokens, textStyle, t } = useSettings();
   const navigate = useNavigate();
   const location = useLocation();
-  const [username, setUsername] = useState('test-01');
-  const [password, setPassword] = useState('123456');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname || '/';
@@ -74,6 +74,7 @@ export function LoginPage() {
               color: tokens.textPrimary,
             }}
             autoComplete="username"
+            placeholder="Username"
             required
           />
         </label>
@@ -93,6 +94,7 @@ export function LoginPage() {
               color: tokens.textPrimary,
             }}
             autoComplete="current-password"
+            placeholder="Password"
             required
           />
         </label>

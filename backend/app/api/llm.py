@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import get_current_user
 from app.config import settings
@@ -239,6 +240,7 @@ def _prepare_tutor_context(
 ) -> tuple[dict[str, Any], list[dict[str, Any]], str | None, str]:
     last_user_message = _last_user_message(request.messages)
     tutor_context = dict(request.tutor_context)
+    tutor_context.pop("material_context_error", None)
     detected_learning_phase = llm.detect_learning_phase(last_user_message)
     previous_learning_phase = str(tutor_context.get("learning_phase") or "")
     learning_phase = (
@@ -628,7 +630,7 @@ def delete_conversation(
 
 
 @router.post("/chat", response_model=dict)
-def tutor_chat(
+async def tutor_chat(
     request: ChatRequest,
     session_id: int | None = None,
     db: Session = Depends(get_db),
@@ -674,12 +676,14 @@ def tutor_chat(
             analytics=analytics,
         )
         result["context_policy"] = context_policy
+        result["material_context_error"] = tutor_context.get("material_context_error")
         if retrieved_material_chunks:
             result["material_context"] = {"chunks": retrieved_material_chunks}
         return result
 
     resolved = _resolve_provider_or_raise(db, current_user, request.provider)
-    result = llm.complete_chat(
+    result = await run_in_threadpool(
+        llm.complete_chat,
         resolved=resolved,
         model=request.model,
         messages=model_messages,
@@ -713,6 +717,7 @@ def tutor_chat(
 
     result["context_policy"] = context_policy
     result["learning_phase"] = result.get("learning_phase", learning_phase)
+    result["material_context_error"] = tutor_context.get("material_context_error")
     if retrieved_material_chunks:
         result["material_context"] = {"chunks": retrieved_material_chunks}
 

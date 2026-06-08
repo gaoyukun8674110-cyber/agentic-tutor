@@ -1,5 +1,7 @@
 """主应用入口"""
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -12,6 +14,20 @@ from app.database import Base, engine
 from app.services.llm_service import LLMService
 from app.utils.errors import http_exception_handler, unhandled_exception_handler
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    initialize_database(
+        base=Base,
+        engine=engine,
+        should_create=should_auto_create_schema(
+            debug=settings.DEBUG,
+            db_auto_create=settings.DB_AUTO_CREATE,
+        ),
+    )
+    app.state.llm_service = LLMService()
+    yield
+
 # 创建数据库表
 
 # 创建 FastAPI 应用
@@ -19,24 +35,17 @@ app = FastAPI(
     title="Tutor 后端服务",
     description="智能数学教学系统后端 API",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 
-def build_cors_options(debug: bool, origins: list[str]) -> tuple[list[str], bool]:
-    if debug:
-        return origins, True
-    return origins, True
-
-
 # CORS 配置
-cors_allow_origins, cors_allow_credentials = build_cors_options(settings.DEBUG, settings.CORS_ORIGINS)
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_allow_origins,
-    allow_credentials=cors_allow_credentials,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept-Language"],
 )
 app.add_exception_handler(Exception, unhandled_exception_handler)
 
@@ -48,19 +57,6 @@ async def starlette_http_exception_adapter(request: Request, exc: Exception) -> 
 
 
 app.add_exception_handler(StarletteHTTPException, starlette_http_exception_adapter)
-
-
-@app.on_event("startup")
-def initialize_app_database():
-    initialize_database(
-        base=Base,
-        engine=engine,
-        should_create=should_auto_create_schema(
-            debug=settings.DEBUG,
-            db_auto_create=settings.DB_AUTO_CREATE,
-        ),
-    )
-    app.state.llm_service = LLMService()
 
 
 @app.middleware("http")

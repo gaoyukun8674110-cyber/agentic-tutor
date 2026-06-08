@@ -46,3 +46,10 @@ def require_matching_user(user_id: str, current_user: User) -> None:
     """Reject attempts to access another user's path-scoped resource."""
     if user_id != current_user.username:
         raise api_error(status.HTTP_403_FORBIDDEN, "forbidden", "User is not authorized for this resource")
+
+
+def require_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Hide admin-only resources from non-admin users."""
+    if current_user.username != "admin":
+        raise api_error(status.HTTP_404_NOT_FOUND, "not_found", "Not found")
+    return current_user

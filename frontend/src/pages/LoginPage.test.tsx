@@ -70,10 +70,21 @@ describe('LoginPage', () => {
     expect(await screen.findByText('Tutor destination')).toBeInTheDocument();
   });
 
+  it('does not prefill the public demo credentials', () => {
+    renderLoginPage();
+
+    expect(screen.getByLabelText('Username')).toHaveValue('');
+    expect(screen.getByLabelText('Password')).toHaveValue('');
+    expect(screen.getByLabelText('Username')).toHaveAttribute('placeholder', 'Username');
+    expect(screen.getByLabelText('Password')).toHaveAttribute('placeholder', 'Password');
+  });
+
   it('shows the backend-facing error and keeps the user on the login form', async () => {
     loginMock.mockRejectedValue(new Error('Invalid credentials'));
     renderLoginPage();
 
+    fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'alice' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'wrong-password' } });
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
 
     expect(await screen.findByText('Invalid credentials')).toBeInTheDocument();

@@ -115,6 +115,9 @@ export async function parseJsonResponse<T>(response: Response): Promise<T> {
         detail = body.detail.user_message || detail;
         code = body.detail.code || code;
         traceId = body.detail.trace_id || traceId;
+      } else {
+        detail = body.message || body.error || detail;
+        code = body.code || code;
       }
     } catch {
       // Keep HTTP status text when the backend does not return JSON.
@@ -163,6 +166,9 @@ async function refreshAccessToken(): Promise<string | null> {
       const payload = await parseJsonResponse<{ access_token: string }>(response);
       accessToken = payload.access_token;
       return accessToken;
+    } catch {
+      accessToken = null;
+      return null;
     } finally {
       refreshInFlight = null;
     }
@@ -194,8 +200,11 @@ export async function apiFetch<T>(path: string, options: ApiRequestOptions = {})
         { ...options, skipAuthRefresh: true },
         refreshedToken,
       );
-    } else if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('auth:logout'));
+    } else {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('auth:logout'));
+      }
+      throw new ApiError('unauthenticated', 401, 'unauthenticated');
     }
   }
 

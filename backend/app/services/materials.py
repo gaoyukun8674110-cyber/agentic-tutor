@@ -33,6 +33,8 @@ WORD_RE = re.compile(r"[\w\u4e00-\u9fff]+", re.UNICODE)
 class EmbeddingProvider(Protocol):
     def embed(self, text: str) -> list[float]: ...
 
+    def embed_batch(self, texts: list[str]) -> list[list[float]]: ...
+
 
 class _HtmlTextExtractor(html.parser.HTMLParser):
     def __init__(self):
@@ -186,6 +188,9 @@ class HashEmbeddingProvider:
             vector[index] += 1.0
         return normalize_vector(vector)
 
+    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        return [self.embed(text) for text in texts]
+
 
 class OpenAIEmbeddingProvider:
     def __init__(self, api_key: str, base_url: str, model: str):
@@ -194,8 +199,14 @@ class OpenAIEmbeddingProvider:
         self.mode = "openai"
 
     def embed(self, text: str) -> list[float]:
-        response = self.client.embeddings.create(model=self.model, input=text)
+        response = self.client.embeddings.create(model=self.model, input=text, timeout=60)
         return [float(value) for value in response.data[0].embedding]
+
+    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        if not texts:
+            return []
+        response = self.client.embeddings.create(model=self.model, input=texts, timeout=60)
+        return [[float(value) for value in item.embedding] for item in response.data]
 
 
 def default_embedding_provider() -> EmbeddingProvider:
@@ -241,6 +252,12 @@ class MaterialService:
     def embedding_mode(self) -> str:
         return str(getattr(self.embedding_provider, "mode", "hash"))
 
+    def _embed_texts(self, texts: list[str]) -> list[list[float]]:
+        embed_batch = getattr(self.embedding_provider, "embed_batch", None)
+        if callable(embed_batch):
+            return embed_batch(texts)
+        return [self.embedding_provider.embed(text) for text in texts]
+
     def create_material_from_bytes(
         self,
         filename: str,
@@ -276,14 +293,15 @@ class MaterialService:
         self.db.add(material)
         self.db.flush()
 
-        for chunk in chunks:
+        embeddings = self._embed_texts([chunk["content"] for chunk in chunks])
+        for chunk, embedding in zip(chunks, embeddings, strict=True):
             self.db.add(
                 StudyMaterialChunk(
                     material_id=material.id,
                     chunk_index=chunk["chunk_index"],
                     content=chunk["content"],
                     source_label=f"{material.filename} · chunk {chunk['chunk_index'] + 1}",
-                    embedding_json=json.dumps(self.embedding_provider.embed(chunk["content"])),
+                    embedding_json=json.dumps(embedding),
                     created_at=now,
                 )
             )
@@ -341,14 +359,15 @@ class MaterialService:
             chunks = chunk_text(extracted_text, chunk_size=self.chunk_size, overlap=self.chunk_overlap)
             now = datetime.now().isoformat()
             self.db.query(StudyMaterialChunk).filter(StudyMaterialChunk.material_id == material.id).delete()
-            for chunk in chunks:
+            embeddings = self._embed_texts([chunk["content"] for chunk in chunks])
+            for chunk, embedding in zip(chunks, embeddings, strict=True):
                 self.db.add(
                     StudyMaterialChunk(
                         material_id=material.id,
                         chunk_index=chunk["chunk_index"],
                         content=chunk["content"],
                         source_label=f"{material.filename} chunk {chunk['chunk_index'] + 1}",
-                        embedding_json=json.dumps(self.embedding_provider.embed(chunk["content"])),
+                        embedding_json=json.dumps(embedding),
                         created_at=now,
                     )
                 )

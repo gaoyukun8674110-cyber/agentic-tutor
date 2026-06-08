@@ -17,6 +17,7 @@ from app.config import settings
 from app.database import get_db
 from app.models.user import RefreshToken, User
 from app.utils.errors import api_error
+from app.utils.rate_limit import is_rate_limited, record_rate_limit_attempt, reset_rate_limit
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -113,11 +114,18 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> dict[st
 def login(
     payload: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)
 ) -> dict[str, object]:
+    client_ip = _client_ip(request) or "unknown"
+    rate_limit_key = ("auth-login", client_ip, payload.username)
+    if is_rate_limited(rate_limit_key, max_attempts=5, window_seconds=60):
+        raise api_error(status.HTTP_429_TOO_MANY_REQUESTS, "rate_limited", "Too many requests")
+
     user = db.query(User).filter(User.username == payload.username).first()
     if not user or not verify_password(payload.password, user.password_hash):
+        record_rate_limit_attempt(rate_limit_key)
         raise api_error(status.HTTP_401_UNAUTHORIZED, "invalid_credentials", "Invalid credentials")
     if not user.is_active:
         raise api_error(status.HTTP_403_FORBIDDEN, "account_disabled", "Account is disabled")
+    reset_rate_limit(rate_limit_key)
 
     now = iso_now()
     user.last_login_at = now
@@ -148,11 +156,11 @@ def refresh(
     if not record:
         raise api_error(status.HTTP_401_UNAUTHORIZED, "invalid_refresh", "Invalid refresh token")
     if record.revoked_at:
-        raise api_error(status.HTTP_401_UNAUTHORIZED, "revoked_refresh", "Refresh token has been revoked")
+        raise api_error(status.HTTP_401_UNAUTHORIZED, "invalid_refresh", "Invalid refresh token")
     if utc_now().isoformat() > record.expires_at:
         record.revoked_at = iso_now()
         db.commit()
-        raise api_error(status.HTTP_401_UNAUTHORIZED, "expired_refresh", "Refresh token expired")
+        raise api_error(status.HTTP_401_UNAUTHORIZED, "invalid_refresh", "Invalid refresh token")
     if not record.user or not record.user.is_active:
         raise api_error(status.HTTP_403_FORBIDDEN, "account_disabled", "Account is disabled")
 

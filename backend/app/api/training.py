@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.database import get_db
-from app.models.session import LearningGoal
+from app.models.session import LearningGoal, TrainingSession
+from app.models.student import Student
 from app.models.user import User
 from app.services.analytics import AnalyticsService
 from app.services.training_engine import TrainingEngine
@@ -25,6 +26,18 @@ class AnswerSubmit(BaseModel):
     answer: str
     time_spent: float
     hint_count: int = 0
+
+
+def _require_session(session_id: int, current_user: User, db: Session) -> TrainingSession:
+    session = (
+        db.query(TrainingSession)
+        .join(Student, Student.id == TrainingSession.student_id)
+        .filter(TrainingSession.id == session_id, Student.user_id == current_user.username)
+        .first()
+    )
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
 
 
 @router.post("/sessions", response_model=dict)
@@ -69,10 +82,15 @@ def create_session(
 
 
 @router.post("/sessions/{session_id}/start", response_model=dict)
-def start_session(session_id: int, db: Session = Depends(get_db)):
+def start_session(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """开始 Session"""
     engine = TrainingEngine(db)
     analytics = AnalyticsService(db)
+    _require_session(session_id, current_user, db)
 
     try:
         session = engine.start_session(session_id)
@@ -80,6 +98,7 @@ def start_session(session_id: int, db: Session = Depends(get_db)):
         analytics.log_behavior(
             log_type="session",
             action="start_session",
+            user_id=current_user.username,
             session_id=session_id,
         )
 
@@ -97,9 +116,11 @@ def get_next_question(
     session_id: int,
     exclude_question_ids: list[int] | None = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """获取下一题"""
     engine = TrainingEngine(db)
+    _require_session(session_id, current_user, db)
 
     result = engine.get_next_question(session_id, exclude_question_ids)
 
@@ -115,10 +136,12 @@ def submit_answer(
     question_id: int,
     answer_data: AnswerSubmit,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """提交答案"""
     engine = TrainingEngine(db)
     analytics = AnalyticsService(db)
+    session = _require_session(session_id, current_user, db)
 
     try:
         result = engine.submit_answer(
@@ -130,11 +153,6 @@ def submit_answer(
         )
 
         # 记录日志
-        from app.models.session import TrainingSession
-        from app.models.student import Student
-
-        session = db.query(TrainingSession).filter(TrainingSession.id == session_id).first()
-
         student = db.query(Student).filter(Student.id == session.student_id).first() if session else None
 
         analytics.log_answer(
@@ -160,10 +178,15 @@ def submit_answer(
 
 
 @router.post("/sessions/{session_id}/complete", response_model=dict)
-def complete_session(session_id: int, db: Session = Depends(get_db)):
+def complete_session(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """完成 Session"""
     engine = TrainingEngine(db)
     analytics = AnalyticsService(db)
+    _require_session(session_id, current_user, db)
 
     try:
         session = engine.complete_session(session_id)
@@ -171,6 +194,7 @@ def complete_session(session_id: int, db: Session = Depends(get_db)):
         analytics.log_behavior(
             log_type="session",
             action="complete_session",
+            user_id=current_user.username,
             session_id=session_id,
         )
 

@@ -512,6 +512,7 @@ class LLMService:
         )
 
         start_time = time.time()
+        client = None
         try:
             client = OpenAI(api_key=resolved.api_key, base_url=resolved.base_url)
             response = client.chat.completions.create(
@@ -519,8 +520,9 @@ class LLMService:
                 messages=chat_messages,
                 temperature=temperature if temperature is not None else settings.OPENAI_TEMPERATURE,
                 max_tokens=max_tokens if max_tokens is not None else settings.OPENAI_MAX_TOKENS,
+                timeout=60,
             )
-            content = response.choices[0].message.content
+            content = response.choices[0].message.content or ""
             duration_ms = (time.time() - start_time) * 1000
             usage = getattr(response, "usage", None)
             usage_payload = {}
@@ -554,6 +556,10 @@ class LLMService:
             }
         except Exception as e:
             return {"error": safe_llm_error(e)}
+        finally:
+            close = getattr(client, "close", None)
+            if callable(close):
+                close()
 
     def chat(
         self,

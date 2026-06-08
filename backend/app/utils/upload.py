@@ -1,8 +1,11 @@
 """Upload validation helpers."""
 
+import io
+import zipfile
 from pathlib import Path
 
 from fastapi import UploadFile
+from pypdf import PdfReader
 
 from app.config import settings
 from app.services.materials import SUPPORTED_EXTENSIONS
@@ -12,6 +15,8 @@ ZIP_SIGNATURE = b"PK\x03\x04"
 PDF_SIGNATURE = b"%PDF-"
 TEXT_EXTENSIONS = {".txt", ".md"}
 ZIP_EXTENSIONS = {".docx", ".epub"}
+MAX_ZIP_UNCOMPRESSED_BYTES = 100 * 1024 * 1024
+MAX_PDF_PAGES = 500
 
 
 def max_upload_bytes() -> int:
@@ -53,10 +58,33 @@ def validate_magic_bytes(filename: str, content: bytes) -> None:
         raise api_error(
             400, "invalid_upload_signature", f"{suffix} upload does not look like a valid ZIP-based document"
         )
-    if suffix == ".pdf" and not content.startswith(PDF_SIGNATURE):
-        raise api_error(400, "invalid_upload_signature", "PDF upload does not start with a PDF signature")
+    if suffix in ZIP_EXTENSIONS:
+        validate_zip_payload(suffix, content)
+    if suffix == ".pdf":
+        if not content.startswith(PDF_SIGNATURE):
+            raise api_error(400, "invalid_upload_signature", "PDF upload does not start with a PDF signature")
+        validate_pdf_payload(content)
     if suffix in TEXT_EXTENSIONS:
         try:
             content.decode("utf-8")
         except UnicodeDecodeError as error:
             raise api_error(400, "invalid_text_upload", "Text uploads must be valid UTF-8") from error
+
+
+def validate_zip_payload(suffix: str, content: bytes) -> None:
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            uncompressed_size = sum(info.file_size for info in archive.infolist())
+    except zipfile.BadZipFile as error:
+        raise api_error(400, "invalid_upload_signature", f"{suffix} upload is not a readable ZIP archive") from error
+    if uncompressed_size > MAX_ZIP_UNCOMPRESSED_BYTES:
+        raise api_error(413, "upload_too_large", "Archive expands beyond the 100 MB safety limit")
+
+
+def validate_pdf_payload(content: bytes) -> None:
+    try:
+        reader = PdfReader(io.BytesIO(content))
+    except Exception as error:
+        raise api_error(400, "invalid_upload_signature", "PDF upload is not readable") from error
+    if len(reader.pages) > MAX_PDF_PAGES:
+        raise api_error(413, "upload_too_large", "PDF exceeds the 500 page safety limit")
