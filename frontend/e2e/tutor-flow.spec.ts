@@ -8,6 +8,8 @@ test('login, ask tutor, and persist conversation history through the backend', a
   });
 
   await page.goto('/login');
+  await page.getByLabel('Username').fill('test-01');
+  await page.getByLabel('Password').fill('123456');
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/$/);
 
@@ -30,15 +32,21 @@ test('login, ask tutor, and persist conversation history through the backend', a
   const conversationId = history.conversations[0].id;
   expect(history.conversations[0].message_count).toBe(2);
 
-  const detailResponse = await page.request.get(`${apiBaseUrl}/api/llm/conversations/${conversationId}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  const detailResponse = await page.request.get(
+    `${apiBaseUrl}/api/llm/conversations/${conversationId}`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+  );
   expect(detailResponse.ok()).toBeTruthy();
   const detail = await detailResponse.json();
   expect(detail.messages).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ role: 'user', content: 'Explain Bayes rule in one sentence' }),
-      expect.objectContaining({ role: 'assistant', content: 'E2E mock tutor response: keep going step by step.' }),
+      expect.objectContaining({
+        role: 'assistant',
+        content: 'E2E mock tutor response: keep going step by step.',
+      }),
     ]),
   );
 });

@@ -115,7 +115,9 @@ describe('apiClient localization and auth refresh', () => {
           { status: 401 },
         ),
       )
-      .mockResolvedValueOnce(new Response(JSON.stringify({ detail: 'bad refresh' }), { status: 500 }));
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ detail: 'bad refresh' }), { status: 500 }),
+      );
 
     await expect(apiFetch<{ ok: boolean }>('/api/dashboard/summary')).rejects.toMatchObject({
       code: 'unauthenticated',

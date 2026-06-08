@@ -28,6 +28,7 @@ async def lifespan(app: FastAPI):
     app.state.llm_service = LLMService()
     yield
 
+
 # 创建数据库表
 
 # 创建 FastAPI 应用
