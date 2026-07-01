@@ -149,7 +149,7 @@ function buildHeaders(options: ApiRequestOptions, token = accessToken): Headers 
   return headers;
 }
 
-async function refreshAccessToken(): Promise<string | null> {
+export async function refreshAccessToken(): Promise<string | null> {
   if (refreshInFlight) return refreshInFlight;
 
   refreshInFlight = (async () => {

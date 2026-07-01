@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { apiFetch, setAccessToken } from '../utils/apiClient';
+import { apiFetch, refreshAccessToken, setAccessToken } from '../utils/apiClient';
 import type { AuthUser, LoginResponse } from './types';
 
 interface AuthContextValue {
@@ -26,11 +26,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loadCurrentUser = useCallback(async () => {
     try {
-      const refreshed = await apiFetch<{ access_token: string }>('/api/auth/refresh', {
-        method: 'POST',
-        skipAuthRefresh: true,
-      });
-      setAccessToken(refreshed.access_token);
+      // Route the bootstrap refresh through the shared, in-flight-deduped helper so
+      // React StrictMode's double effect invocation shares one request instead of
+      // firing two rotating refreshes (the second would hit an already-revoked token).
+      const token = await refreshAccessToken();
+      if (!token) {
+        setUser(null);
+        return;
+      }
       const payload = await apiFetch<{ user: AuthUser }>('/api/auth/me');
       setUser(payload.user);
     } catch {
