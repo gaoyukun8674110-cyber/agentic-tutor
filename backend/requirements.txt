@@ -2,6 +2,8 @@ fastapi==0.136.1
 uvicorn[standard]==0.24.0
 sqlalchemy==2.0.23
 alembic==1.12.1
+pgvector
+psycopg[binary]
 pydantic==2.13.4
 pydantic-settings==2.14.2
 python-dotenv==1.2.2
@@ -17,4 +19,3 @@ loguru==0.7.2
 passlib[argon2]==1.7.4
 PyJWT==2.13.0
 cryptography==48.0.1
-

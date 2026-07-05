@@ -7,7 +7,9 @@ from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from app.config import settings
 from app.database import Base
+from app.models.materials import StudyMaterial, StudyMaterialChunk
 from app.services.materials import (
     HashEmbeddingProvider,
     MaterialService,
@@ -117,6 +119,14 @@ class MaterialRagTests(unittest.TestCase):
         self.assertLessEqual(len(chunks[0]["content"]), 18)
         self.assertIn("alpha", chunks[0]["content"])
 
+    def test_default_hash_embedding_uses_configured_pgvector_dimension(self):
+        self.assertEqual(getattr(settings, "RAG_EMBEDDING_DIM", None), 1536)
+
+        provider = HashEmbeddingProvider()
+
+        self.assertEqual(provider.dimensions, settings.RAG_EMBEDDING_DIM)
+        self.assertEqual(len(provider.embed("posterior probability")), settings.RAG_EMBEDDING_DIM)
+
     def test_material_service_uploads_chunks_and_searches_relevant_context(self):
         db = self.SessionLocal()
         try:
@@ -141,6 +151,9 @@ class MaterialRagTests(unittest.TestCase):
                     top_k=3,
                 )
 
+                legacy_index_name = ".vector" + "-index.json"
+                self.assertFalse((Path(tmpdir) / legacy_index_name).exists())
+
             self.assertEqual(material["filename"], "probability-notes.txt")
             self.assertEqual(material["status"], "ready")
             self.assertGreaterEqual(material["chunk_count"], 1)
@@ -151,7 +164,132 @@ class MaterialRagTests(unittest.TestCase):
         finally:
             db.close()
 
-    def test_material_search_uses_vector_index_instead_of_recent_chunk_window(self):
+    def test_bruteforce_vector_store_orders_and_filters_candidates(self):
+        from app.services.vector_store import BruteForceVectorStore
+
+        db = self.SessionLocal()
+        try:
+            material_one = StudyMaterial(
+                user_id="alice",
+                filename="alice-ready.txt",
+                file_type="txt",
+                content_type="text/plain",
+                storage_path="alice-ready.txt",
+                status="ready",
+                char_count=10,
+                chunk_count=2,
+                created_at="now",
+                updated_at="now",
+            )
+            material_two = StudyMaterial(
+                user_id="alice",
+                filename="alice-other.txt",
+                file_type="txt",
+                content_type="text/plain",
+                storage_path="alice-other.txt",
+                status="ready",
+                char_count=10,
+                chunk_count=1,
+                created_at="now",
+                updated_at="now",
+            )
+            material_bob = StudyMaterial(
+                user_id="bob",
+                filename="bob-ready.txt",
+                file_type="txt",
+                content_type="text/plain",
+                storage_path="bob-ready.txt",
+                status="ready",
+                char_count=10,
+                chunk_count=1,
+                created_at="now",
+                updated_at="now",
+            )
+            material_pending = StudyMaterial(
+                user_id="alice",
+                filename="alice-pending.txt",
+                file_type="txt",
+                content_type="text/plain",
+                storage_path="alice-pending.txt",
+                status="pending",
+                char_count=10,
+                chunk_count=1,
+                created_at="now",
+                updated_at="now",
+            )
+            db.add_all([material_one, material_two, material_bob, material_pending])
+            db.flush()
+            db.add_all(
+                [
+                    StudyMaterialChunk(
+                        material_id=material_one.id,
+                        chunk_index=0,
+                        content="best match",
+                        source_label="best match",
+                        embedding_json="[1.0, 0.0, 0.0]",
+                        created_at="now",
+                    ),
+                    StudyMaterialChunk(
+                        material_id=material_one.id,
+                        chunk_index=1,
+                        content="second match",
+                        source_label="second match",
+                        embedding_json="[0.8, 0.6, 0.0]",
+                        created_at="now",
+                    ),
+                    StudyMaterialChunk(
+                        material_id=material_two.id,
+                        chunk_index=0,
+                        content="filtered material",
+                        source_label="filtered material",
+                        embedding_json="[0.0, 1.0, 0.0]",
+                        created_at="now",
+                    ),
+                    StudyMaterialChunk(
+                        material_id=material_bob.id,
+                        chunk_index=0,
+                        content="wrong user",
+                        source_label="wrong user",
+                        embedding_json="[1.0, 0.0, 0.0]",
+                        created_at="now",
+                    ),
+                    StudyMaterialChunk(
+                        material_id=material_pending.id,
+                        chunk_index=0,
+                        content="not ready",
+                        source_label="not ready",
+                        embedding_json="[1.0, 0.0, 0.0]",
+                        created_at="now",
+                    ),
+                ]
+            )
+            db.commit()
+
+            store = BruteForceVectorStore()
+
+            results = store.search(
+                db,
+                query_vector=[1.0, 0.0, 0.0],
+                top_k=5,
+                user_id="alice",
+                material_ids={material_one.id},
+            )
+
+            self.assertEqual([score for _chunk_id, score in results], [1.0, 0.8])
+            self.assertEqual(len(results), 2)
+        finally:
+            db.close()
+
+    def test_vector_store_factory_uses_bruteforce_for_sqlite(self):
+        from app.services.vector_store import BruteForceVectorStore, make_vector_store
+
+        db = self.SessionLocal()
+        try:
+            self.assertIsInstance(make_vector_store(db), BruteForceVectorStore)
+        finally:
+            db.close()
+
+    def test_material_search_uses_similarity_store_instead_of_recent_chunk_window(self):
         db = self.SessionLocal()
         try:
             with tempfile.TemporaryDirectory() as tmpdir:
@@ -199,7 +337,7 @@ class MaterialRagTests(unittest.TestCase):
         finally:
             db.close()
 
-    def test_material_search_honors_material_id_filters_with_vector_index(self):
+    def test_material_search_honors_material_id_filters_with_similarity_store(self):
         db = self.SessionLocal()
         try:
             with tempfile.TemporaryDirectory() as tmpdir:

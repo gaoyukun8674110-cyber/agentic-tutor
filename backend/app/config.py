@@ -95,7 +95,9 @@ class Settings(BaseSettings):
     RAG_TOP_K: int = 5
     RAG_SEARCH_CANDIDATE_LIMIT: int = 500
     RAG_EMBEDDING_MODEL: str = "text-embedding-3-small"
-    RAG_HASH_EMBEDDING_DIMENSIONS: int = 128
+    RAG_EMBEDDING_DIM: int = 1536
+    RAG_HASH_EMBEDDING_DIMENSIONS: int = 1536
+    RAG_HNSW_EF_SEARCH: int = 40
 
     def model_post_init(self, __context: object) -> None:
         global _warned_ephemeral_jwt_secret
