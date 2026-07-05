@@ -99,10 +99,7 @@ class PgVectorStore:
             statement = statement.bindparams(bindparam("material_ids", expanding=True))
 
         rows = db.execute(statement, params).all()
-        return [
-            (int(chunk_id), round(max(0.0, float(score or 0.0)), 6))
-            for chunk_id, score in rows
-        ]
+        return [(int(chunk_id), round(max(0.0, float(score or 0.0)), 6)) for chunk_id, score in rows]
 
 
 class BruteForceVectorStore:
@@ -140,7 +137,7 @@ class BruteForceVectorStore:
         scored: list[tuple[int, float]] = []
         for chunk in query.all():
             try:
-                raw_vector = json.loads(chunk.embedding_json)
+                raw_vector = json.loads(str(chunk.embedding_json))
                 if not isinstance(raw_vector, list) or not raw_vector:
                     continue
                 vector = [float(value) for value in raw_vector]
