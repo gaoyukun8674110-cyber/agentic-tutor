@@ -472,6 +472,37 @@ class LLMService:
                     self._clients[provider] = client
         return client
 
+    def _create_chat_completion(self, client: OpenAI, **kwargs) -> tuple[str, dict[str, int | None]]:
+        """Call chat completions in streaming mode and aggregate content plus usage."""
+        stream_kwargs = {**kwargs, "stream": True, "stream_options": {"include_usage": True}}
+        try:
+            stream = client.chat.completions.create(**stream_kwargs)
+        except Exception:
+            fallback_kwargs = {**kwargs, "stream": True}
+            stream = client.chat.completions.create(**fallback_kwargs)
+
+        content_parts: list[str] = []
+        usage_payload: dict[str, int | None] = {}
+        for chunk in stream:
+            usage = getattr(chunk, "usage", None)
+            if usage:
+                usage_payload = {
+                    "prompt_tokens": getattr(usage, "prompt_tokens", None),
+                    "completion_tokens": getattr(usage, "completion_tokens", None),
+                    "total_tokens": getattr(usage, "total_tokens", None),
+                }
+
+            choices = getattr(chunk, "choices", None) or []
+            if not choices:
+                continue
+
+            delta = getattr(choices[0], "delta", None)
+            delta_content = getattr(delta, "content", None)
+            if delta_content is not None:
+                content_parts.append(delta_content)
+
+        return "".join(content_parts), usage_payload
+
     def complete_chat(
         self,
         resolved: "ResolvedProvider",
@@ -515,23 +546,15 @@ class LLMService:
         client = None
         try:
             client = OpenAI(api_key=resolved.api_key, base_url=resolved.base_url)
-            response = client.chat.completions.create(
+            content, usage_payload = self._create_chat_completion(
+                client,
                 model=selected_model,
                 messages=chat_messages,
                 temperature=temperature if temperature is not None else settings.OPENAI_TEMPERATURE,
                 max_tokens=max_tokens if max_tokens is not None else settings.OPENAI_MAX_TOKENS,
                 timeout=60,
             )
-            content = response.choices[0].message.content or ""
             duration_ms = (time.time() - start_time) * 1000
-            usage = getattr(response, "usage", None)
-            usage_payload = {}
-            if usage:
-                usage_payload = {
-                    "prompt_tokens": getattr(usage, "prompt_tokens", None),
-                    "completion_tokens": getattr(usage, "completion_tokens", None),
-                    "total_tokens": getattr(usage, "total_tokens", None),
-                }
 
             self._safe_log_llm_call(
                 user_id=user_id,
@@ -615,22 +638,14 @@ class LLMService:
         start_time = time.time()
         try:
             client = self._get_provider_client(provider, provider_config)
-            response = client.chat.completions.create(
+            content, usage_payload = self._create_chat_completion(
+                client,
                 model=selected_model,
                 messages=chat_messages,
                 temperature=settings.OPENAI_TEMPERATURE,
                 max_tokens=settings.OPENAI_MAX_TOKENS,
             )
-            content = response.choices[0].message.content
             duration_ms = (time.time() - start_time) * 1000
-            usage = getattr(response, "usage", None)
-            usage_payload = {}
-            if usage:
-                usage_payload = {
-                    "prompt_tokens": getattr(usage, "prompt_tokens", None),
-                    "completion_tokens": getattr(usage, "completion_tokens", None),
-                    "total_tokens": getattr(usage, "total_tokens", None),
-                }
 
             self._safe_log_llm_call(
                 user_id=user_id,
@@ -681,7 +696,8 @@ class LLMService:
 
         start_time = time.time()
         try:
-            response = self.client.chat.completions.create(
+            hint, _ = self._create_chat_completion(
+                self.client,
                 model=settings.OPENAI_MODEL,
                 messages=[
                     {"role": "system", "content": self.agent_prompts["tutor"]},
@@ -690,8 +706,6 @@ class LLMService:
                 temperature=0.7,
                 max_tokens=200,
             )
-
-            hint = response.choices[0].message.content
 
             duration_ms = (time.time() - start_time) * 1000
 
@@ -744,7 +758,8 @@ class LLMService:
 
         start_time = time.time()
         try:
-            response = self.client.chat.completions.create(
+            explanation, _ = self._create_chat_completion(
+                self.client,
                 model=settings.OPENAI_MODEL,
                 messages=[
                     {"role": "system", "content": self.agent_prompts["tutor"]},
@@ -753,8 +768,6 @@ class LLMService:
                 temperature=0.7,
                 max_tokens=500,
             )
-
-            explanation = response.choices[0].message.content
 
             duration_ms = (time.time() - start_time) * 1000
 
@@ -808,7 +821,8 @@ class LLMService:
 
         start_time = time.time()
         try:
-            response = self.client.chat.completions.create(
+            diagnosis, _ = self._create_chat_completion(
+                self.client,
                 model=settings.OPENAI_MODEL,
                 messages=[
                     {"role": "system", "content": self.agent_prompts["diagnosis"]},
@@ -817,8 +831,6 @@ class LLMService:
                 temperature=0.5,  # 诊断需要更准确
                 max_tokens=400,
             )
-
-            diagnosis = response.choices[0].message.content
 
             duration_ms = (time.time() - start_time) * 1000
 
@@ -866,7 +878,8 @@ class LLMService:
 
         start_time = time.time()
         try:
-            response = self.client.chat.completions.create(
+            summary, _ = self._create_chat_completion(
+                self.client,
                 model=settings.OPENAI_MODEL,
                 messages=[
                     {"role": "system", "content": self.agent_prompts["pomodoro_coach"]},
@@ -875,8 +888,6 @@ class LLMService:
                 temperature=0.8,
                 max_tokens=300,
             )
-
-            summary = response.choices[0].message.content
 
             duration_ms = (time.time() - start_time) * 1000
 

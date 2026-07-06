@@ -89,6 +89,28 @@ llm_module = load_llm_module()
 LLMService = llm_module.LLMService
 
 
+class FakeDelta:
+    def __init__(self, content):
+        self.content = content
+
+
+class FakeStreamChoice:
+    def __init__(self, content):
+        self.delta = FakeDelta(content)
+
+
+class FakeUsage:
+    prompt_tokens = 12
+    completion_tokens = 8
+    total_tokens = 20
+
+
+class FakeStreamChunk:
+    def __init__(self, content=None, usage=None):
+        self.choices = [] if content is None else [FakeStreamChoice(content)]
+        self.usage = usage
+
+
 class FakeMessage:
     def __init__(self, content):
         self.content = content
@@ -97,12 +119,6 @@ class FakeMessage:
 class FakeChoice:
     def __init__(self, content):
         self.message = FakeMessage(content)
-
-
-class FakeUsage:
-    prompt_tokens = 12
-    completion_tokens = 8
-    total_tokens = 20
 
 
 class FakeCompletion:
@@ -118,6 +134,19 @@ class FakeCompletions:
     def create(self, **kwargs):
         self.calls.append(kwargs)
         return FakeCompletion("先观察题目中的已知条件。")
+
+
+class FakeCompletions:
+    def __init__(self):
+        self.calls = []
+
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        return [
+            FakeStreamChunk("streamed "),
+            FakeStreamChunk("response"),
+            FakeStreamChunk(usage=FakeUsage()),
+        ]
 
 
 class FakeChat:
@@ -149,12 +178,6 @@ class FailingOpenAIClient:
         FailingOpenAIClient.instances.append(self)
 
 
-class NoneContentCompletions(FakeCompletions):
-    def create(self, **kwargs):
-        self.calls.append(kwargs)
-        return FakeCompletion(None)
-
-
 class NoneContentOpenAIClient:
     instances = []
 
@@ -163,6 +186,12 @@ class NoneContentOpenAIClient:
         self.chat = FakeChat()
         self.chat.completions = NoneContentCompletions()
         NoneContentOpenAIClient.instances.append(self)
+
+
+class NoneContentCompletions(FakeCompletions):
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        return [FakeStreamChunk(usage=FakeUsage())]
 
 
 class LLMChatTests(unittest.TestCase):
@@ -305,7 +334,7 @@ class LLMChatTests(unittest.TestCase):
                 tutor_context={"goal": "一次方程训练", "timer_state": "focus"},
             )
 
-        self.assertEqual(result["message"]["content"], "先观察题目中的已知条件。")
+        self.assertEqual(result["message"]["content"], "streamed response")
         self.assertEqual(result["provider"], "deepseek")
         self.assertEqual(result["model"], "deepseek-chat")
         created_client = FakeOpenAIClient.instances[0]
@@ -316,6 +345,58 @@ class LLMChatTests(unittest.TestCase):
         self.assertEqual(call["messages"][0]["role"], "system")
         self.assertIn("苏格拉底", call["messages"][0]["content"])
         self.assertIn("一次方程训练", call["messages"][0]["content"])
+
+        self.assertIs(call["stream"], True)
+        self.assertEqual(call["stream_options"], {"include_usage": True})
+        self.assertEqual(
+            result["usage"],
+            {"prompt_tokens": 12, "completion_tokens": 8, "total_tokens": 20},
+        )
+
+    def test_create_chat_completion_aggregates_stream_content_and_usage(self):
+        service = LLMService()
+        client = FakeOpenAIClient()
+
+        content, usage = service._create_chat_completion(
+            client,
+            model="gpt-test",
+            messages=[{"role": "user", "content": "hello"}],
+            temperature=0.1,
+            max_tokens=20,
+            timeout=60,
+        )
+
+        self.assertEqual(content, "streamed response")
+        self.assertEqual(usage, {"prompt_tokens": 12, "completion_tokens": 8, "total_tokens": 20})
+        call = client.chat.completions.calls[0]
+        self.assertIs(call["stream"], True)
+        self.assertEqual(call["stream_options"], {"include_usage": True})
+        self.assertEqual(call["timeout"], 60)
+
+    def test_create_chat_completion_retries_without_stream_options_when_provider_rejects_it(self):
+        class RejectingStreamOptionsCompletions(FakeCompletions):
+            def create(self, **kwargs):
+                self.calls.append(kwargs)
+                if "stream_options" in kwargs:
+                    raise TypeError("unexpected keyword argument 'stream_options'")
+                return [FakeStreamChunk("fallback")]
+
+        client = FakeOpenAIClient()
+        client.chat.completions = RejectingStreamOptionsCompletions()
+        service = LLMService()
+
+        content, usage = service._create_chat_completion(
+            client,
+            model="gpt-test",
+            messages=[{"role": "user", "content": "hello"}],
+        )
+
+        self.assertEqual(content, "fallback")
+        self.assertEqual(usage, {})
+        self.assertEqual(len(client.chat.completions.calls), 2)
+        self.assertIn("stream_options", client.chat.completions.calls[0])
+        self.assertNotIn("stream_options", client.chat.completions.calls[1])
+        self.assertIs(client.chat.completions.calls[1]["stream"], True)
 
     def _configure_fake_settings(self, fake_settings):
         fake_settings.OPENAI_API_KEY = "secret-openai"

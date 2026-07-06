@@ -254,20 +254,20 @@ class LLMChatCredentialResolutionTests(unittest.TestCase):
     def test_chat_accepts_resolved_provider_and_reports_credential_source(self):
         from app.services.llm_service import LLMService
 
-        class FakeMessage:
+        class FakeDelta:
             content = "ok"
 
         class FakeChoice:
-            message = FakeMessage()
+            delta = FakeDelta()
 
-        class FakeResponse:
+        class FakeChunk:
             choices = [FakeChoice()]
             usage = None
 
         class FakeCompletions:
             def create(self, **kwargs):
                 self.kwargs = kwargs
-                return FakeResponse()
+                return [FakeChunk()]
 
         class FakeChat:
             def __init__(self):
