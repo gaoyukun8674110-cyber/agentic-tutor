@@ -133,15 +133,6 @@ class FakeCompletions:
 
     def create(self, **kwargs):
         self.calls.append(kwargs)
-        return FakeCompletion("先观察题目中的已知条件。")
-
-
-class FakeCompletions:
-    def __init__(self):
-        self.calls = []
-
-    def create(self, **kwargs):
-        self.calls.append(kwargs)
         return [
             FakeStreamChunk("streamed "),
             FakeStreamChunk("response"),
