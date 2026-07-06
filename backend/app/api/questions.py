@@ -1,12 +1,13 @@
 """题目相关 API"""
+
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from typing import List, Optional
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
 from app.api.deps import get_current_user
 from app.database import get_db
+from app.models.question import DifficultyLevel, QuestionType
 from app.services.question_bank import QuestionBankService
-from app.models.question import QuestionType, DifficultyLevel
 
 router = APIRouter(prefix="/api/questions", tags=["questions"], dependencies=[Depends(get_current_user)])
 
@@ -17,22 +18,22 @@ class QuestionCreate(BaseModel):
     standard_solution: str
     question_type: str
     difficulty: str
-    skills: List[dict]
-    tags: Optional[List[str]] = None
-    options: Optional[List[str]] = None
-    solution_steps: Optional[List[dict]] = None
-    source: Optional[str] = None
-    chapter: Optional[str] = None
-    prerequisites: Optional[List[str]] = None
+    skills: list[dict]
+    tags: list[str] | None = None
+    options: list[str] | None = None
+    solution_steps: list[dict] | None = None
+    source: str | None = None
+    chapter: str | None = None
+    prerequisites: list[str] | None = None
 
 
 class QuestionSearch(BaseModel):
-    skill_ids: Optional[List[str]] = None
-    difficulty: Optional[str] = None
-    question_type: Optional[str] = None
-    chapter: Optional[str] = None
-    exclude_question_ids: Optional[List[int]] = None
-    limit: Optional[int] = None
+    skill_ids: list[str] | None = None
+    difficulty: str | None = None
+    question_type: str | None = None
+    chapter: str | None = None
+    exclude_question_ids: list[int] | None = None
+    limit: int | None = None
     random: bool = False
 
 
@@ -40,7 +41,7 @@ class QuestionSearch(BaseModel):
 def create_question(question: QuestionCreate, db: Session = Depends(get_db)):
     """创建题目"""
     service = QuestionBankService(db)
-    
+
     try:
         q = service.create_question(
             content=question.content,
@@ -58,7 +59,7 @@ def create_question(question: QuestionCreate, db: Session = Depends(get_db)):
         )
         return {"id": q.id, "message": "Question created successfully"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.get("/{question_id}", response_model=dict)
@@ -66,10 +67,10 @@ def get_question(question_id: int, db: Session = Depends(get_db)):
     """获取题目"""
     service = QuestionBankService(db)
     question = service.get_question(question_id)
-    
+
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
-    
+
     return {
         "id": question.id,
         "content": question.content,
@@ -86,10 +87,10 @@ def get_solution(question_id: int, db: Session = Depends(get_db)):
     """获取标准解"""
     service = QuestionBankService(db)
     solution = service.get_standard_solution(question_id)
-    
+
     if not solution:
         raise HTTPException(status_code=404, detail="Question not found")
-    
+
     return solution
 
 
@@ -97,7 +98,7 @@ def get_solution(question_id: int, db: Session = Depends(get_db)):
 def search_questions(search: QuestionSearch, db: Session = Depends(get_db)):
     """搜索题目"""
     service = QuestionBankService(db)
-    
+
     questions = service.search_questions(
         skill_ids=search.skill_ids,
         difficulty=DifficultyLevel(search.difficulty) if search.difficulty else None,
@@ -107,7 +108,7 @@ def search_questions(search: QuestionSearch, db: Session = Depends(get_db)):
         limit=search.limit,
         random=search.random,
     )
-    
+
     return {
         "count": len(questions),
         "questions": [
@@ -120,4 +121,3 @@ def search_questions(search: QuestionSearch, db: Session = Depends(get_db)):
             for q in questions
         ],
     }
-

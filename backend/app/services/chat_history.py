@@ -1,13 +1,13 @@
 """Persistence helpers for Tutor chat conversations."""
-from datetime import datetime
+
 import re
-from typing import Any, Dict, List, Optional
+from datetime import datetime
+from typing import Any
 
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.models.chat_history import TutorConversation, TutorConversationDigest, TutorConversationMessage
-
 
 SUGGEST_NEW_CHAT_EXCHANGE_COUNT = 10
 SUMMARY_EXCHANGE_COUNT = 15
@@ -46,26 +46,22 @@ class ChatHistoryService:
 
     def list_conversations(
         self,
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
         limit: int = 50,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         query = self.db.query(TutorConversation)
         if user_id:
             query = query.filter(self._user_scope_filter(user_id))
 
-        conversations = (
-            query.order_by(TutorConversation.updated_at.desc())
-            .limit(max(1, min(limit, 100)))
-            .all()
-        )
+        conversations = query.order_by(TutorConversation.updated_at.desc()).limit(max(1, min(limit, 100))).all()
         return [self._conversation_summary(conversation) for conversation in conversations]
 
     def search_conversations(
         self,
         query: str,
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
         limit: int = 20,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         cleaned_query = " ".join((query or "").split())
         if not cleaned_query:
             return self.list_conversations(user_id=user_id, limit=limit)
@@ -93,7 +89,7 @@ class ChatHistoryService:
 
         max_results = max(1, min(limit, 100))
         seen_ids = set()
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
         for conversation in conversation_query.all():
             if conversation.id in seen_ids:
                 continue
@@ -106,8 +102,8 @@ class ChatHistoryService:
     def get_conversation(
         self,
         conversation_id: int,
-        user_id: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
+        user_id: str | None = None,
+    ) -> dict[str, Any] | None:
         conversation = self._get_conversation_model(conversation_id, user_id)
         if not conversation:
             return None
@@ -130,8 +126,8 @@ class ChatHistoryService:
     def export_conversation_markdown(
         self,
         conversation_id: int,
-        user_id: Optional[str] = None,
-    ) -> Optional[Dict[str, str]]:
+        user_id: str | None = None,
+    ) -> dict[str, str] | None:
         conversation = self.get_conversation(conversation_id, user_id=user_id)
         if not conversation:
             return None
@@ -168,8 +164,8 @@ class ChatHistoryService:
         self,
         conversation_id: int,
         pending_user_message: str,
-        user_id: Optional[str] = None,
-    ) -> Optional[List[Dict[str, str]]]:
+        user_id: str | None = None,
+    ) -> list[dict[str, str]] | None:
         conversation = self._get_conversation_model(conversation_id, user_id)
         if not conversation:
             return None
@@ -179,7 +175,7 @@ class ChatHistoryService:
         if next_exchange_count <= SUMMARY_EXCHANGE_COUNT or not digest:
             return None
 
-        compact_messages: List[Dict[str, str]] = [
+        compact_messages: list[dict[str, str]] = [
             {
                 "role": "user",
                 "content": (
@@ -202,8 +198,8 @@ class ChatHistoryService:
         conversation_id: int,
         content: str,
         source_message_count: int,
-        user_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        user_id: str | None = None,
+    ) -> dict[str, Any]:
         conversation = self._get_conversation_model(conversation_id, user_id)
         if not conversation:
             raise ValueError("Conversation not found")
@@ -233,7 +229,7 @@ class ChatHistoryService:
         digest = self._get_digest_model(conversation_id)
         return digest is None or digest.source_message_count < source_message_count
 
-    def build_fallback_summary(self, messages: List[Dict[str, Any]]) -> str:
+    def build_fallback_summary(self, messages: list[dict[str, Any]]) -> str:
         user_messages = [message["content"] for message in messages if message.get("role") == "user"]
         assistant_messages = [message["content"] for message in messages if message.get("role") == "assistant"]
         latest_user = user_messages[-1] if user_messages else ""
@@ -252,7 +248,7 @@ class ChatHistoryService:
     def delete_conversation(
         self,
         conversation_id: int,
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
     ) -> bool:
         conversation = self._get_conversation_model(conversation_id, user_id)
         if not conversation:
@@ -264,16 +260,16 @@ class ChatHistoryService:
 
     def save_exchange(
         self,
-        conversation_id: Optional[int],
+        conversation_id: int | None,
         user_message: str,
         assistant_message: str,
         prompt_profile: str,
         provider: str,
         model: str,
-        training_mode: Optional[str],
-        user_id: Optional[str] = None,
-        assistant_label: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        training_mode: str | None,
+        user_id: str | None = None,
+        assistant_label: str | None = None,
+    ) -> dict[str, Any]:
         now = datetime.now().isoformat()
         conversation = None
         if conversation_id is not None:
@@ -331,8 +327,8 @@ class ChatHistoryService:
     def _get_conversation_model(
         self,
         conversation_id: int,
-        user_id: Optional[str],
-    ) -> Optional[TutorConversation]:
+        user_id: str | None,
+    ) -> TutorConversation | None:
         query = self.db.query(TutorConversation).filter(TutorConversation.id == conversation_id)
         if user_id:
             query = query.filter(self._user_scope_filter(user_id))
@@ -342,7 +338,7 @@ class ChatHistoryService:
     def _user_scope_filter(user_id: str):
         return TutorConversation.user_id == user_id
 
-    def _conversation_summary(self, conversation: TutorConversation) -> Dict[str, Any]:
+    def _conversation_summary(self, conversation: TutorConversation) -> dict[str, Any]:
         preview = ""
         if conversation.messages:
             preview = conversation.messages[-1].content[:90]
@@ -357,13 +353,14 @@ class ChatHistoryService:
             "model": conversation.model,
             "message_count": conversation.message_count,
             "exchange_count": self.exchange_count(conversation.message_count),
-            "should_suggest_new_chat": self.exchange_count(conversation.message_count) >= SUGGEST_NEW_CHAT_EXCHANGE_COUNT,
+            "should_suggest_new_chat": self.exchange_count(conversation.message_count)
+            >= SUGGEST_NEW_CHAT_EXCHANGE_COUNT,
             "should_start_new_chat": self.exchange_count(conversation.message_count) >= SUMMARY_EXCHANGE_COUNT,
             "created_at": conversation.created_at,
             "updated_at": conversation.updated_at,
         }
 
-    def _get_digest_model(self, conversation_id: int) -> Optional[TutorConversationDigest]:
+    def _get_digest_model(self, conversation_id: int) -> TutorConversationDigest | None:
         return (
             self.db.query(TutorConversationDigest)
             .filter(TutorConversationDigest.conversation_id == conversation_id)

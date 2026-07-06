@@ -70,7 +70,9 @@ interface TutorSidebarProps {
 }
 
 function formatTime(totalSeconds: number) {
-  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+  const minutes = Math.floor(totalSeconds / 60)
+    .toString()
+    .padStart(2, '0');
   const seconds = (totalSeconds % 60).toString().padStart(2, '0');
   return `${minutes}:${seconds}`;
 }
@@ -162,7 +164,11 @@ export function TutorSidebar({
       }}
     >
       <div className="flex h-14 items-center justify-between px-4">
-        <button onClick={onExit} className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-[var(--ai-hover-surface)]" aria-label={t('返回首页', 'Back')}>
+        <button
+          onClick={onExit}
+          className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-[var(--ai-hover-surface)]"
+          aria-label={t('返回首页', 'Back')}
+        >
           <ArrowLeft className="h-5 w-5" />
         </button>
         <button
@@ -175,7 +181,10 @@ export function TutorSidebar({
       </div>
 
       <div className="space-y-1 px-3">
-        <button onClick={onStartNewChat} className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-[15px] hover:bg-[var(--ai-hover-surface)]">
+        <button
+          onClick={onStartNewChat}
+          className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-[15px] hover:bg-[var(--ai-hover-surface)]"
+        >
           <Plus className="h-5 w-5" />
           {t('新学习会话', 'New study chat')}
         </button>
@@ -190,7 +199,14 @@ export function TutorSidebar({
 
         {historySearchOpen && (
           <div className="px-3 pb-2">
-            <div className="flex h-9 items-center gap-2 rounded-md px-2" style={{ background: tokens.inputSurface, border: tokens.borderSubtle, boxShadow: tokens.shadowSoft }}>
+            <div
+              className="flex h-9 items-center gap-2 rounded-md px-2"
+              style={{
+                background: tokens.inputSurface,
+                border: tokens.borderSubtle,
+                boxShadow: tokens.shadowSoft,
+              }}
+            >
               <Search className="h-4 w-4 shrink-0" style={{ color: tokens.textSecondary }} />
               <input
                 ref={historySearchInputRef}
@@ -201,7 +217,10 @@ export function TutorSidebar({
                 style={{ color: tokens.textPrimary }}
               />
               {isSearchingHistory ? (
-                <Loader2 className="h-4 w-4 shrink-0 animate-spin" style={{ color: tokens.textSecondary }} />
+                <Loader2
+                  className="h-4 w-4 shrink-0 animate-spin"
+                  style={{ color: tokens.textSecondary }}
+                />
               ) : (
                 <button
                   onClick={onCloseHistorySearch}
@@ -217,14 +236,25 @@ export function TutorSidebar({
         )}
 
         <div className="pt-2">
-          <div className="px-3 pb-1 text-xs" style={{ color: tokens.textMuted }}>{t('配置', 'Settings')}</div>
-          <label className="block rounded-md px-3 py-2 transition-colors hover:bg-[var(--ai-hover-surface)]" style={sidebarCardStyle(tokens)}>
-            <span className="mb-2 flex items-center gap-2 text-[13px]" style={{ color: tokens.textSecondary }}>
+          <div className="px-3 pb-1 text-xs" style={{ color: tokens.textMuted }}>
+            {t('配置', 'Settings')}
+          </div>
+          <label
+            className="block rounded-md px-3 py-2 transition-colors hover:bg-[var(--ai-hover-surface)]"
+            style={sidebarCardStyle(tokens)}
+          >
+            <span
+              className="mb-2 flex items-center gap-2 text-[13px]"
+              style={{ color: tokens.textSecondary }}
+            >
               <MessageSquareText className="h-4 w-4" />
               {t('教学策略', 'Profile')}
             </span>
             <Select value={selectedProfile} onValueChange={onSelectedProfileChange}>
-              <SelectTrigger className="h-8 bg-[var(--ai-input-surface)] hover:bg-[var(--ai-input-surface)] focus:bg-[var(--ai-input-surface)]" style={{ color: tokens.textPrimary, border: tokens.borderSubtle }}>
+              <SelectTrigger
+                className="h-8 bg-[var(--ai-input-surface)] hover:bg-[var(--ai-input-surface)] focus:bg-[var(--ai-input-surface)]"
+                style={{ color: tokens.textPrimary, border: tokens.borderSubtle }}
+              >
                 <SelectValue placeholder={t('选择策略', 'Choose profile')} />
               </SelectTrigger>
               <SelectContent>
@@ -243,13 +273,23 @@ export function TutorSidebar({
               onChange={(event) => onCustomPromptChange(event.target.value)}
               placeholder={t('自定义系统提示词', 'Custom system prompt')}
               className="mx-3 mt-2 min-h-20 w-[calc(100%-24px)] resize-none rounded-lg px-3 py-2 text-sm outline-none placeholder:text-[var(--ai-placeholder-text)]"
-              style={{ background: tokens.inputSurface, border: tokens.borderSubtle, color: tokens.textPrimary }}
+              style={{
+                background: tokens.inputSurface,
+                border: tokens.borderSubtle,
+                color: tokens.textPrimary,
+              }}
             />
           )}
 
-          <div className="mt-2 rounded-md px-3 py-2 transition-colors hover:bg-[var(--ai-hover-surface)]" style={sidebarCardStyle(tokens)}>
+          <div
+            className="mt-2 rounded-md px-3 py-2 transition-colors hover:bg-[var(--ai-hover-surface)]"
+            style={sidebarCardStyle(tokens)}
+          >
             <div className="mb-2 flex items-center justify-between gap-2">
-              <span className="flex min-w-0 items-center gap-2 text-[13px]" style={{ color: tokens.textSecondary }}>
+              <span
+                className="flex min-w-0 items-center gap-2 text-[13px]"
+                style={{ color: tokens.textSecondary }}
+              >
                 <BookOpen className="h-4 w-4 shrink-0" />
                 {t('学习资料', 'Study materials')}
               </span>
@@ -268,68 +308,119 @@ export function TutorSidebar({
               onClick={() => materialInputRef.current?.click()}
               disabled={isUploadingMaterial}
               className="flex h-8 w-full items-center justify-center gap-2 rounded-md border border-transparent text-sm hover:bg-[var(--ai-hover-surface)]"
-              style={{ background: tokens.inputSurface, boxShadow: tokens.shadowSoft, color: isUploadingMaterial ? tokens.disabledText : tokens.textPrimary }}
+              style={{
+                background: tokens.inputSurface,
+                boxShadow: tokens.shadowSoft,
+                color: isUploadingMaterial ? tokens.disabledText : tokens.textPrimary,
+              }}
             >
-              {isUploadingMaterial ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              {isUploadingMaterial ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4" />
+              )}
               {isUploadingMaterial ? t('上传中', 'Uploading') : t('上传资料', 'Upload file')}
             </button>
 
             {materials.length > 0 ? (
               <div className="mt-2 max-h-36 space-y-1 overflow-y-auto">
                 {materials.map((material) => (
-                  <label key={material.id} className="flex min-w-0 items-center gap-2 rounded-md px-1 py-1 text-xs hover:bg-[var(--ai-hover-surface)]" style={{ color: tokens.textSecondary }}>
+                  <label
+                    key={material.id}
+                    className="flex min-w-0 items-center gap-2 rounded-md px-1 py-1 text-xs hover:bg-[var(--ai-hover-surface)]"
+                    style={{ color: tokens.textSecondary }}
+                  >
                     <input
                       type="checkbox"
                       checked={selectedMaterialIds.includes(material.id)}
                       onChange={() => onToggleMaterialSelection(material.id)}
                       className="h-3.5 w-3.5 shrink-0"
                     />
-                    <FileText className="h-3.5 w-3.5 shrink-0" style={{ color: tokens.textSecondary }} />
+                    <FileText
+                      className="h-3.5 w-3.5 shrink-0"
+                      style={{ color: tokens.textSecondary }}
+                    />
                     <span className="min-w-0 flex-1 truncate">{material.filename}</span>
-                    <span className="shrink-0" style={{ color: tokens.textMuted }}>{material.chunk_count}</span>
+                    <span className="shrink-0" style={{ color: tokens.textMuted }}>
+                      {material.chunk_count}
+                    </span>
                   </label>
                 ))}
               </div>
             ) : (
               <div className="mt-2 text-xs leading-5" style={{ color: tokens.textMuted }}>
-                {t('支持 .txt / .md / .docx / .pdf / .epub', 'Supports .txt / .md / .docx / .pdf / .epub')}
+                {t(
+                  '支持 .txt / .md / .docx / .pdf / .epub',
+                  'Supports .txt / .md / .docx / .pdf / .epub',
+                )}
               </div>
             )}
 
             {materialError && (
-              <div className="mt-2 flex gap-1.5 rounded-md px-2 py-1.5 text-xs" style={{ background: tokens.warningSoft, color: tokens.warning }}>
+              <div
+                className="mt-2 flex gap-1.5 rounded-md px-2 py-1.5 text-xs"
+                style={{ background: tokens.warningSoft, color: tokens.warning }}
+              >
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                 <span>{materialError}</span>
               </div>
             )}
           </div>
 
-          <div className="mt-2 rounded-md px-3 py-2 transition-colors hover:bg-[var(--ai-hover-surface)]" style={sidebarCardStyle(tokens)}>
+          <div
+            className="mt-2 rounded-md px-3 py-2 transition-colors hover:bg-[var(--ai-hover-surface)]"
+            style={sidebarCardStyle(tokens)}
+          >
             <div className="mb-2 flex items-center justify-between">
-              <span className="flex items-center gap-2 text-[13px]" style={{ color: tokens.textSecondary }}>
+              <span
+                className="flex items-center gap-2 text-[13px]"
+                style={{ color: tokens.textSecondary }}
+              >
                 <Clock3 className="h-4 w-4" />
                 {t('番茄钟设置', 'Pomodoro')}
               </span>
-              <span className="text-sm font-semibold tabular-nums">{formatTime(remainingSeconds)}</span>
+              <span className="text-sm font-semibold tabular-nums">
+                {formatTime(remainingSeconds)}
+              </span>
             </div>
             <div className="flex gap-2">
-              <button onClick={onToggleTimer} className="flex h-8 flex-1 items-center justify-center gap-1 rounded-md text-sm hover:bg-[var(--ai-hover-surface)]" style={{ background: tokens.inputSurface }}>
+              <button
+                onClick={onToggleTimer}
+                className="flex h-8 flex-1 items-center justify-center gap-1 rounded-md text-sm hover:bg-[var(--ai-hover-surface)]"
+                style={{ background: tokens.inputSurface }}
+              >
                 {isRunning ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                {isRunning ? t('暂停', 'Pause') : timerHasStarted ? t('继续', 'Resume') : t('开始', 'Start')}
+                {isRunning
+                  ? t('暂停', 'Pause')
+                  : timerHasStarted
+                    ? t('继续', 'Resume')
+                    : t('开始', 'Start')}
               </button>
-              <button onClick={onResetTimer} className="flex h-8 w-9 items-center justify-center rounded-md hover:bg-[var(--ai-hover-surface)]" style={{ background: tokens.inputSurface }} aria-label={t('重置计时', 'Reset timer')}>
+              <button
+                onClick={onResetTimer}
+                className="flex h-8 w-9 items-center justify-center rounded-md hover:bg-[var(--ai-hover-surface)]"
+                style={{ background: tokens.inputSurface }}
+                aria-label={t('重置计时', 'Reset timer')}
+              >
                 <RotateCcw className="h-4 w-4" />
               </button>
             </div>
             {timerState !== 'focus' && (
-              <button onClick={onStartNextRound} className="mt-2 h-8 w-full rounded-md text-sm hover:bg-[var(--ai-hover-surface)]" style={{ background: tokens.inputSurface }}>
+              <button
+                onClick={onStartNextRound}
+                className="mt-2 h-8 w-full rounded-md text-sm hover:bg-[var(--ai-hover-surface)]"
+                style={{ background: tokens.inputSurface }}
+              >
                 {t('开始下一轮', 'Start next round')}
               </button>
             )}
           </div>
 
           {loadError && (
-            <div className="mx-3 mt-2 flex gap-2 rounded-lg px-3 py-2 text-xs" style={{ background: tokens.warningSoft, color: tokens.warning }}>
+            <div
+              className="mx-3 mt-2 flex gap-2 rounded-lg px-3 py-2 text-xs"
+              style={{ background: tokens.warningSoft, color: tokens.warning }}
+            >
               <AlertTriangle className="h-4 w-4 shrink-0" />
               <span>{loadError}</span>
             </div>
@@ -338,7 +429,10 @@ export function TutorSidebar({
       </div>
 
       <div className="mt-4 px-3 pb-4" style={{ minHeight: 0, flex: 1, overflowY: 'auto' }}>
-        <div className="mb-1 flex items-center gap-2 px-3 text-xs" style={{ color: tokens.textMuted }}>
+        <div
+          className="mb-1 flex items-center gap-2 px-3 text-xs"
+          style={{ color: tokens.textMuted }}
+        >
           <History className="h-3.5 w-3.5" />
           {historySearchOpen && historySearchQuery.trim()
             ? t(`搜索结果 · ${historyItems.length}`, `Search results · ${historyItems.length}`)
@@ -350,11 +444,19 @@ export function TutorSidebar({
               <div
                 key={item.id}
                 className="group flex items-center gap-2 rounded-xl px-3 py-2 hover:bg-[var(--ai-hover-surface)]"
-                style={{ background: activeConversationId === item.id ? tokens.hoverSurface : 'transparent' }}
+                style={{
+                  background:
+                    activeConversationId === item.id ? tokens.hoverSurface : 'transparent',
+                }}
               >
-                <button onClick={() => onOpenHistoryItem(item.id)} className="min-w-0 flex-1 text-left">
+                <button
+                  onClick={() => onOpenHistoryItem(item.id)}
+                  className="min-w-0 flex-1 text-left"
+                >
                   <span className="block truncate text-[15px]">{item.title}</span>
-                  <span className="block text-xs" style={{ color: tokens.textMuted }}>{formatHistoryMeta(item, language)}</span>
+                  <span className="block text-xs" style={{ color: tokens.textMuted }}>
+                    {formatHistoryMeta(item, language)}
+                  </span>
                 </button>
                 <button
                   onClick={() => onExportHistoryItem(item.id)}
@@ -378,9 +480,15 @@ export function TutorSidebar({
             ))}
           </div>
         ) : (
-          <div className="rounded-xl px-3 py-3 text-sm leading-5" style={{ color: tokens.textMuted }}>
+          <div
+            className="rounded-xl px-3 py-3 text-sm leading-5"
+            style={{ color: tokens.textMuted }}
+          >
             {historyLoadError
-              ? t('学习记录暂时无法同步，请确认后端服务已启动。', 'Study sessions are temporarily unavailable. Check that the backend is running.')
+              ? t(
+                  '学习记录暂时无法同步，请确认后端服务已启动。',
+                  'Study sessions are temporarily unavailable. Check that the backend is running.',
+                )
               : historySearchOpen && historySearchQuery.trim()
                 ? t('没有匹配的学习记录', 'No matching study sessions')
                 : t('还没有学习记录', 'No study sessions yet')}

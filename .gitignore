@@ -46,4 +46,7 @@ pnpm-debug.log*
 Thumbs.db
 .playwright-cli/
 .learnings/
-
+AI_TUTOR_AUDIT-*.md
+backend/push.sh
+docs/rag-flow-interactive.html
+repomix-output.xml

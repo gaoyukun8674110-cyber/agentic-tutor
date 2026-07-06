@@ -26,7 +26,20 @@ export function StudyCalendar({ events = [] }: StudyCalendarProps) {
   const monthNames = useMemo(
     () =>
       language === 'zh'
-        ? ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月']
+        ? [
+            '一月',
+            '二月',
+            '三月',
+            '四月',
+            '五月',
+            '六月',
+            '七月',
+            '八月',
+            '九月',
+            '十月',
+            '十一月',
+            '十二月',
+          ]
         : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
     [language],
   );
@@ -48,7 +61,11 @@ export function StudyCalendar({ events = [] }: StudyCalendarProps) {
       setSelectedDate((currentSelectedDate) => {
         const baseDate = currentSelectedDate ?? nextMonth;
         const lastDay = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
-        return new Date(nextMonth.getFullYear(), nextMonth.getMonth(), Math.min(baseDate.getDate(), lastDay));
+        return new Date(
+          nextMonth.getFullYear(),
+          nextMonth.getMonth(),
+          Math.min(baseDate.getDate(), lastDay),
+        );
       });
       return nextMonth;
     });
@@ -111,7 +128,11 @@ export function StudyCalendar({ events = [] }: StudyCalendarProps) {
             type="button"
             aria-label={t('上一个月', 'Previous month')}
             className="flex h-8 w-8 items-center justify-center rounded-lg border transition-colors"
-            style={{ background: tokens.surface, border: tokens.borderSoft, color: tokens.textPrimary }}
+            style={{
+              background: tokens.surface,
+              border: tokens.borderSoft,
+              color: tokens.textPrimary,
+            }}
             onClick={() => moveMonth(-1)}
           >
             <ChevronLeft className="h-4 w-4" />
@@ -123,7 +144,11 @@ export function StudyCalendar({ events = [] }: StudyCalendarProps) {
             type="button"
             aria-label={t('下一个月', 'Next month')}
             className="flex h-8 w-8 items-center justify-center rounded-lg border transition-colors"
-            style={{ background: tokens.surface, border: tokens.borderSoft, color: tokens.textPrimary }}
+            style={{
+              background: tokens.surface,
+              border: tokens.borderSoft,
+              color: tokens.textPrimary,
+            }}
             onClick={() => moveMonth(1)}
           >
             <ChevronRight className="h-4 w-4" />
@@ -150,9 +175,15 @@ export function StudyCalendar({ events = [] }: StudyCalendarProps) {
       className="overflow-hidden rounded-2xl shadow-sm transition-all duration-300"
       style={{ background: tokens.surface, border: tokens.borderStrong, boxShadow: tokens.shadow }}
     >
-      <div className="border-b p-6" style={{ background: tokens.surfaceMuted, borderBottom: tokens.borderSoft }}>
+      <div
+        className="border-b p-6"
+        style={{ background: tokens.surfaceMuted, borderBottom: tokens.borderSoft }}
+      >
         <div className="flex items-center gap-2">
-          <div className="rounded-xl p-2" style={{ background: tokens.surfaceAccent, border: tokens.borderSoft }}>
+          <div
+            className="rounded-xl p-2"
+            style={{ background: tokens.surfaceAccent, border: tokens.borderSoft }}
+          >
             <Calendar className="h-5 w-5" style={{ color: tokens.accentPrimary }} />
           </div>
           <h2 className="text-lg font-medium" style={{ color: tokens.accentPrimary }}>
@@ -162,7 +193,10 @@ export function StudyCalendar({ events = [] }: StudyCalendarProps) {
       </div>
 
       <div className="p-6">
-        <div className="mb-4 rounded-2xl" style={{ background: tokens.surfaceMuted, border: tokens.borderSoft }}>
+        <div
+          className="mb-4 rounded-2xl"
+          style={{ background: tokens.surfaceMuted, border: tokens.borderSoft }}
+        >
           {renderCalendar()}
         </div>
 
@@ -186,7 +220,8 @@ export function StudyCalendar({ events = [] }: StudyCalendarProps) {
             {selectedEvents.length > 0 ? (
               <div className="space-y-3">
                 {selectedEvents.map((event, index) => {
-                  const eventStyle = typeStyles[event.type as keyof typeof typeStyles] || typeStyles.task;
+                  const eventStyle =
+                    typeStyles[event.type as keyof typeof typeStyles] || typeStyles.task;
                   const eventColor =
                     eventStyle.tone === 'success'
                       ? tokens.success
@@ -213,7 +248,10 @@ export function StudyCalendar({ events = [] }: StudyCalendarProps) {
                             <div className="font-medium" style={{ color: tokens.textPrimary }}>
                               {event.title}
                             </div>
-                            <div className="flex items-center gap-1 text-sm" style={{ color: tokens.textSecondary }}>
+                            <div
+                              className="flex items-center gap-1 text-sm"
+                              style={{ color: tokens.textSecondary }}
+                            >
                               <Clock className="h-3 w-3" />
                               <span>{event.time || event.subtitle}</span>
                             </div>

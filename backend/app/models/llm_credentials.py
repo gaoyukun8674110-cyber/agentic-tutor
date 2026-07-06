@@ -1,4 +1,5 @@
 """Per-user LLM provider credentials."""
+
 from sqlalchemy import Boolean, Column, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 

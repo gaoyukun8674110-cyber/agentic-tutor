@@ -10,7 +10,11 @@ describe('tutorQueryKeys', () => {
 
   it('includes search terms in the conversations key', () => {
     expect(tutorQueryKeys.conversations('')).toEqual(['tutor', 'conversations', { search: '' }]);
-    expect(tutorQueryKeys.conversations('bayes')).toEqual(['tutor', 'conversations', { search: 'bayes' }]);
+    expect(tutorQueryKeys.conversations('bayes')).toEqual([
+      'tutor',
+      'conversations',
+      { search: 'bayes' },
+    ]);
   });
 
   it('includes the conversation id in detail keys', () => {

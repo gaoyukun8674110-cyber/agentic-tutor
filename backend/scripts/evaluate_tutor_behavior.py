@@ -13,7 +13,6 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-
 REQUIRED_CASE_FIELDS = {"id", "category", "prompt_profile", "messages", "expectations"}
 REQUIRED_EXPECTATION_FIELDS = {"required_behaviors", "forbidden_behaviors"}
 
@@ -62,9 +61,7 @@ def validate_case(raw_case: dict[str, Any], line_number: int) -> dict[str, Any]:
         raise ValueError(f"Case {case_id} expectations must be an object")
     missing_expectations = REQUIRED_EXPECTATION_FIELDS - set(expectations)
     if missing_expectations:
-        raise ValueError(
-            f"Case {case_id} expectations missing fields: {', '.join(sorted(missing_expectations))}"
-        )
+        raise ValueError(f"Case {case_id} expectations missing fields: {', '.join(sorted(missing_expectations))}")
 
     normalized = dict(raw_case)
     normalized["id"] = case_id

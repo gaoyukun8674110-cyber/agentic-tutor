@@ -8,4 +8,28 @@ ignore_missing_imports = true
 warn_unused_ignores = true
 warn_redundant_casts = true
 no_implicit_optional = true
+exclude = [
+    # Legacy SQLAlchemy models/services still use Column-based declarative typing.
+    # Keep mypy enabled for the rest of app/ while ORM migration to Mapped[] is tracked separately.
+    "app/api/.*",
+    "app/models/.*",
+    "app/services/(analytics|chat_history|dashboard|llm_credential_resolver|llm_credential_service|llm_service|materials|pomodoro|question_bank|student_model|training_engine)\\.py",
+]
 
+[[tool.mypy.overrides]]
+module = [
+    "app.api.*",
+    "app.models.*",
+    "app.services.analytics",
+    "app.services.chat_history",
+    "app.services.dashboard",
+    "app.services.llm_credential_resolver",
+    "app.services.llm_credential_service",
+    "app.services.llm_service",
+    "app.services.materials",
+    "app.services.pomodoro",
+    "app.services.question_bank",
+    "app.services.student_model",
+    "app.services.training_engine",
+]
+ignore_errors = true

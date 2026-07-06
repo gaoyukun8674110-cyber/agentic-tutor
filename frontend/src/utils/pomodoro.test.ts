@@ -127,9 +127,9 @@ describe('pomodoro utilities', () => {
   it('starts the next round from focus mode', () => {
     const nextState = startNextPomodoroRound(
       {
-      ...createInitialPomodoroState(),
-      mode: 'longBreak',
-      remainingSeconds: 20 * 60,
+        ...createInitialPomodoroState(),
+        mode: 'longBreak',
+        remainingSeconds: 20 * 60,
       },
       10_000,
     );

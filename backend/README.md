@@ -54,6 +54,27 @@ uvicorn app.main:app --reload
 - RAG v1 stores source files, chunks text, and uses OpenAI embeddings when configured; hash embeddings are explicitly surfaced as `embedding_mode="hash"` for offline development and tests.
 - Upload ingestion creates a `pending` material first and fills embeddings in a background task to avoid holding the HTTP response open for long PDFs.
 
+## RAG pgvector Runtime
+
+RAG retrieval now requires PostgreSQL with pgvector. Start the local database from the repository root:
+
+```bash
+docker compose up -d db
+python -m alembic upgrade head
+```
+
+Set `DATABASE_URL=postgresql+psycopg://tutor:tutor@localhost:55432/tutor` for local development. Embeddings use dedicated RAG settings and must not reuse chat provider routing:
+
+```bash
+RAG_EMBEDDING_API_KEY=
+RAG_EMBEDDING_BASE_URL=https://api.openai.com/v1
+RAG_EMBEDDING_MODEL=text-embedding-3-small
+RAG_VECTOR_DIM=1536
+RAG_HNSW_EF_SEARCH=40
+```
+
+`RAG_EMBEDDING_API_KEY` must be an official OpenAI embedding key. Chat providers such as SSSAiCode can still be configured through `OPENAI_BASE_URL`, but that setting is not used for material embeddings.
+
 ## Tutor 行为评测雏形
 
 项目包含一个轻量级 Tutor 行为 eval scaffold，用来证明关键教学行为可以被结构化检查。当前版本只做 JSONL schema 校验和 case 分类汇总，不执行复杂 LLM judge。
@@ -74,7 +95,7 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 
 Set the generated value as `LLM_CREDENTIAL_ENCRYPTION_KEY`. For key rotation, deploy the new key as `LLM_CREDENTIAL_ENCRYPTION_KEY` and move the previous active key into comma-separated `LLM_CREDENTIAL_PREVIOUS_KEYS`; old credentials remain decryptable while new writes use the new key. Set `LLM_FINGERPRINT_HMAC_KEY` to a separate random secret when possible; otherwise the app derives an HMAC secret from the encryption key.
 
-`ALLOW_GLOBAL_LLM_FALLBACK=True` keeps backend `.env` provider keys available for demo/admin fallback. Set it to `False` when users must bring their own keys.
+`ALLOW_GLOBAL_LLM_FALLBACK=False` is the default so user traffic does not silently fall back to shared backend provider keys. Only set it to `True` for an intentional local demo/admin fallback.
 
 Seed cases 位于 `evals/tutor_cases.jsonl`，覆盖：
 

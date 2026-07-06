@@ -12,8 +12,8 @@ export function LoginPage() {
   const { tokens, textStyle, t } = useSettings();
   const navigate = useNavigate();
   const location = useLocation();
-  const [username, setUsername] = useState('test-01');
-  const [password, setPassword] = useState('123456');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname || '/';
@@ -35,11 +35,21 @@ export function LoginPage() {
   };
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center px-6 py-10" style={{ ...textStyle, color: tokens.textPrimary }}>
+    <main
+      className="relative flex min-h-screen items-center justify-center px-6 py-10"
+      style={{ ...textStyle, color: tokens.textPrimary }}
+    >
       <div className="fixed inset-0" style={{ background: tokens.pageGradient }} />
-      <form onSubmit={submit} className="relative w-full max-w-md rounded-2xl p-8 shadow-xl" style={cardSurfaceStyle(tokens)}>
+      <form
+        onSubmit={submit}
+        className="relative w-full max-w-md rounded-2xl p-8 shadow-xl"
+        style={cardSurfaceStyle(tokens)}
+      >
         <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl" style={{ background: tokens.surfaceAccent }}>
+          <div
+            className="flex h-11 w-11 items-center justify-center rounded-xl"
+            style={{ background: tokens.surfaceAccent }}
+          >
             <Brain className="h-6 w-6" />
           </div>
           <div>
@@ -58,8 +68,13 @@ export function LoginPage() {
             value={username}
             onChange={(event) => setUsername(event.target.value)}
             className="w-full rounded-xl border px-4 py-3 outline-none"
-            style={{ background: tokens.surface, borderColor: tokens.borderStrong, color: tokens.textPrimary }}
+            style={{
+              background: tokens.surface,
+              borderColor: tokens.borderStrong,
+              color: tokens.textPrimary,
+            }}
             autoComplete="username"
+            placeholder="Username"
             required
           />
         </label>
@@ -73,15 +88,25 @@ export function LoginPage() {
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             className="w-full rounded-xl border px-4 py-3 outline-none"
-            style={{ background: tokens.surface, borderColor: tokens.borderStrong, color: tokens.textPrimary }}
+            style={{
+              background: tokens.surface,
+              borderColor: tokens.borderStrong,
+              color: tokens.textPrimary,
+            }}
             autoComplete="current-password"
+            placeholder="Password"
             required
           />
         </label>
 
         {error ? <p className="mb-4 text-sm text-red-500">{error}</p> : null}
 
-        <Button type="submit" disabled={isSubmitting} className="w-full rounded-xl py-3 text-white" style={primaryActionStyle(tokens)}>
+        <Button
+          type="submit"
+          disabled={isSubmitting}
+          className="w-full rounded-xl py-3 text-white"
+          style={primaryActionStyle(tokens)}
+        >
           {isSubmitting ? t('登录中...', 'Signing in...') : t('登录', 'Sign in')}
         </Button>
 

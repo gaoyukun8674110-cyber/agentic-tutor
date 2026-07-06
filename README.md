@@ -1,5 +1,7 @@
 # AI Tutor Monorepo
 
+Portfolio project: do not deploy as-is to production without replacing local demo data, secrets, and runtime settings.
+
 This repository contains the AI Tutor backend and frontend in one workspace.
 
 ## Layout
@@ -16,6 +18,7 @@ scripts/   Root-level helper scripts for local development and validation
 Start the backend:
 
 ```powershell
+docker compose up -d db
 cd backend
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
@@ -33,10 +36,12 @@ npm run dev
 
 Defaults:
 
-- Backend: `http://localhost:8000`
+- Backend: `http://localhost:8001`
 - Frontend: `http://localhost:4173`
-- Frontend API base: `VITE_API_BASE_URL`, defaulting to `http://localhost:8000`
-- Demo login after `alembic upgrade head`: `test-01` / `123456`
+- Frontend API base: `VITE_API_BASE_URL`, defaulting to `http://localhost:8001`
+- Database: PostgreSQL + pgvector, default `postgresql+psycopg://tutor:tutor@localhost:55432/tutor`
+- RAG embeddings use `RAG_EMBEDDING_API_KEY` and `RAG_EMBEDDING_BASE_URL=https://api.openai.com/v1`, independent of chat provider settings.
+- Local migrations may create a demo account for development. Replace or disable any seeded demo credentials before exposing a deployment.
 - Auth transport: short-lived JWT access tokens in `Authorization: Bearer ...`, plus an HttpOnly refresh cookie scoped to `/api/auth`.
 
 ## Validation

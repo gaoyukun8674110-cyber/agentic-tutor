@@ -1,24 +1,32 @@
 """Access and refresh token helpers."""
+
 from __future__ import annotations
 
 import hashlib
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import jwt
-from jwt import ExpiredSignatureError, InvalidTokenError as JwtInvalidTokenError
+from jwt import ExpiredSignatureError
+from jwt import InvalidTokenError as JwtInvalidTokenError
 
 from app.auth.exceptions import InvalidTokenError, TokenExpiredError
 from app.config import settings
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def iso_now() -> str:
     return utc_now().isoformat()
+
+
+def _jwt_secret() -> str:
+    if not settings.JWT_SECRET:
+        raise RuntimeError("JWT_SECRET must be configured before issuing tokens")
+    return settings.JWT_SECRET
 
 
 def encode_access_token(username: str, ttl_seconds: int | None = None) -> str:
@@ -30,12 +38,12 @@ def encode_access_token(username: str, ttl_seconds: int | None = None) -> str:
         "iat": int(issued_at.timestamp()),
         "exp": int(expires_at.timestamp()),
     }
-    return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+    return jwt.encode(payload, _jwt_secret(), algorithm=settings.JWT_ALGORITHM)
 
 
 def decode_access_token(token: str) -> dict[str, Any]:
     try:
-        claims = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+        claims = jwt.decode(token, _jwt_secret(), algorithms=[settings.JWT_ALGORITHM])
     except ExpiredSignatureError as exc:
         raise TokenExpiredError("Access token expired") from exc
     except JwtInvalidTokenError as exc:

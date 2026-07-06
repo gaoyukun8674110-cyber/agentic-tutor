@@ -2,7 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { CheckCircle2, Circle, Clock, Edit3, Plus, Save, Trash2, X } from 'lucide-react';
 
-import { createDashboardTask, deleteDashboardTask, updateDashboardTask, type DashboardTask } from '../utils/dashboardApi';
+import {
+  createDashboardTask,
+  deleteDashboardTask,
+  updateDashboardTask,
+  type DashboardTask,
+} from '../utils/dashboardApi';
 import { clampDurationMinutes } from '../utils/duration';
 import { cardSurfaceStyle, inputSurfaceStyle, panelSurfaceStyle } from '../utils/glassStyles';
 import { useSettings } from '../utils/settings';
@@ -51,7 +56,8 @@ export function TodayPlan({ onStatsChange, onDataChange, tasks = [] }: TodayPlan
     onStatsChange?.(stats);
   }, [stats, onStatsChange]);
 
-  const progressPercentage = stats.totalTasks > 0 ? (stats.completedTasks / stats.totalTasks) * 100 : 0;
+  const progressPercentage =
+    stats.totalTasks > 0 ? (stats.completedTasks / stats.totalTasks) * 100 : 0;
 
   const resetForm = () => {
     setSubject('');
@@ -118,7 +124,8 @@ export function TodayPlan({ onStatsChange, onDataChange, tasks = [] }: TodayPlan
     },
   });
 
-  const isBusy = saveTaskMutation.isPending || toggleTaskMutation.isPending || deleteTaskMutation.isPending;
+  const isBusy =
+    saveTaskMutation.isPending || toggleTaskMutation.isPending || deleteTaskMutation.isPending;
 
   const saveTask = () => {
     const cleanTask = taskText.trim();
@@ -163,7 +170,10 @@ export function TodayPlan({ onStatsChange, onDataChange, tasks = [] }: TodayPlan
   };
 
   return (
-    <div className="h-full overflow-hidden rounded-2xl shadow-sm transition-all duration-300" style={cardStyle}>
+    <div
+      className="h-full overflow-hidden rounded-2xl shadow-sm transition-all duration-300"
+      style={cardStyle}
+    >
       <div className="border-b p-6" style={panelStyle}>
         <div className="flex items-center justify-between gap-4">
           <div>
@@ -179,8 +189,14 @@ export function TodayPlan({ onStatsChange, onDataChange, tasks = [] }: TodayPlan
           </div>
         </div>
 
-        <div className="mt-4 h-3 w-full rounded-full" style={{ background: tokens.surfaceAccent, border: tokens.borderSoft as string }}>
-          <div className="h-3 rounded-full transition-all duration-300" style={{ width: `${progressPercentage}%`, background: tokens.progressGradient }} />
+        <div
+          className="mt-4 h-3 w-full rounded-full"
+          style={{ background: tokens.surfaceAccent, border: tokens.borderSoft as string }}
+        >
+          <div
+            className="h-3 rounded-full transition-all duration-300"
+            style={{ width: `${progressPercentage}%`, background: tokens.progressGradient }}
+          />
         </div>
       </div>
 
@@ -230,7 +246,11 @@ export function TodayPlan({ onStatsChange, onDataChange, tasks = [] }: TodayPlan
               {editingId ? t('保存', 'Save') : t('添加', 'Add')}
             </button>
             {editingId && (
-              <button onClick={resetForm} className="flex h-10 w-10 items-center justify-center rounded-xl" style={panelStyle}>
+              <button
+                onClick={resetForm}
+                className="flex h-10 w-10 items-center justify-center rounded-xl"
+                style={panelStyle}
+              >
                 <X className="h-4 w-4" />
               </button>
             )}
@@ -246,7 +266,11 @@ export function TodayPlan({ onStatsChange, onDataChange, tasks = [] }: TodayPlan
         ) : (
           <div className="space-y-3">
             {tasks.map((task) => (
-              <div key={task.id} className="group rounded-2xl border p-4 transition-all duration-200" style={panelStyle}>
+              <div
+                key={task.id}
+                className="group rounded-2xl border p-4 transition-all duration-200"
+                style={panelStyle}
+              >
                 <div className="flex items-start gap-4">
                   <button
                     onClick={() => toggleTask(task)}
@@ -257,16 +281,29 @@ export function TodayPlan({ onStatsChange, onDataChange, tasks = [] }: TodayPlan
                     {task.completed ? (
                       <CheckCircle2 className="h-6 w-6" style={{ color: tokens.success }} />
                     ) : (
-                      <Circle className="h-6 w-6 transition-colors" style={{ color: tokens.textMuted }} />
+                      <Circle
+                        className="h-6 w-6 transition-colors"
+                        style={{ color: tokens.textMuted }}
+                      />
                     )}
                   </button>
 
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className={task.completed ? 'line-through' : ''} style={{ color: task.completed ? tokens.success : tokens.textPrimary }}>
+                      <span
+                        className={task.completed ? 'line-through' : ''}
+                        style={{ color: task.completed ? tokens.success : tokens.textPrimary }}
+                      >
                         {task.subject}
                       </span>
-                      <span className="rounded-lg px-2 py-1 text-xs font-medium" style={{ background: tokens.surface, border: tokens.borderSoft, color: priorityColors[task.priority] }}>
+                      <span
+                        className="rounded-lg px-2 py-1 text-xs font-medium"
+                        style={{
+                          background: tokens.surface,
+                          border: tokens.borderSoft,
+                          color: priorityColors[task.priority],
+                        }}
+                      >
                         {priorityStyles[task.priority].label}
                       </span>
                     </div>
@@ -279,7 +316,10 @@ export function TodayPlan({ onStatsChange, onDataChange, tasks = [] }: TodayPlan
                     >
                       {task.task}
                     </p>
-                    <div className="mt-2 flex items-center gap-1 text-xs" style={{ color: tokens.textSecondary }}>
+                    <div
+                      className="mt-2 flex items-center gap-1 text-xs"
+                      style={{ color: tokens.textSecondary }}
+                    >
                       <Clock className="h-3 w-3" style={{ color: tokens.accentPrimary }} />
                       {task.duration}
                       {t('分钟', ' min')}
@@ -313,14 +353,20 @@ export function TodayPlan({ onStatsChange, onDataChange, tasks = [] }: TodayPlan
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div className="rounded-2xl p-4" style={panelStyle}>
             <div style={{ color: tokens.success }}>{t('已完成', 'Done')}</div>
-            <div className="mt-1 text-2xl font-semibold tabular-nums" style={{ color: tokens.textPrimary }}>
+            <div
+              className="mt-1 text-2xl font-semibold tabular-nums"
+              style={{ color: tokens.textPrimary }}
+            >
               {stats.completedMinutes}
               {t('分钟', ' min')}
             </div>
           </div>
           <div className="rounded-2xl p-4" style={panelStyle}>
             <div style={{ color: tokens.accentPrimary }}>{t('计划总计', 'Planned')}</div>
-            <div className="mt-1 text-2xl font-semibold tabular-nums" style={{ color: tokens.textPrimary }}>
+            <div
+              className="mt-1 text-2xl font-semibold tabular-nums"
+              style={{ color: tokens.textPrimary }}
+            >
               {stats.totalMinutes}
               {t('分钟', ' min')}
             </div>

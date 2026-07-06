@@ -1,0 +1,70 @@
+# H:\ai-tutor 文件夹作用说明
+
+生成时间：2026-05-15
+
+说明：本文基于当前 `H:\ai-tutor` 仓库目录整理。依赖目录、构建产物、缓存目录不作为业务源码目录展开，但会在末尾单独说明。
+
+## 根目录
+
+- `.git/`：Git 版本控制元数据目录，记录提交历史、分支、索引等信息。不要手工修改。
+- `.github/`：仓库级 GitHub 配置目录。
+- `.github/workflows/`：仓库级 GitHub Actions 工作流配置目录，用于 CI、检查或自动化任务。
+- `.learnings/`：本地/项目学习记录目录，用于保存开发过程中积累的经验或问题记录。
+- `backend/`：FastAPI 后端服务目录，包含 API 路由、数据库模型、认证、业务服务、迁移、评测脚本和后端测试。
+- `docs/`：跨项目文档目录，存放前后端共同适用的架构说明、设计记录和项目说明。当前文件也放在这里。
+- `frontend/`：Vite + React 前端应用目录，包含页面、组件、状态逻辑、API 客户端、样式、脚本和前端测试。
+- `scripts/`：仓库根级辅助脚本目录，用于统一启动、测试或校验前后端项目。
+
+## backend 后端目录
+
+- `backend/.github/`：后端子项目相关的 GitHub 配置目录。
+- `backend/.github/workflows/`：后端子项目相关的 GitHub Actions 工作流目录。
+- `backend/alembic/`：Alembic 数据库迁移配置和迁移运行环境目录。
+- `backend/alembic/versions/`：具体数据库迁移脚本目录，记录表结构、种子数据和数据修正的版本变化。
+- `backend/app/`：后端应用主包，承载 FastAPI 应用入口、配置、数据库连接和各类业务模块。
+- `backend/app/api/`：HTTP API 路由层，定义认证、LLM、资料、训练、统计、学生、题目等接口。
+- `backend/app/auth/`：认证与授权相关逻辑，包括密码处理、Token、Cookie 和认证异常。
+- `backend/app/models/`：SQLAlchemy 数据模型目录，定义用户、题目、训练会话、学习资料、聊天历史、统计数据和 LLM 凭据等表结构。
+- `backend/app/services/`：业务服务层，包含题库、训练引擎、学生模型、番茄钟、统计、资料 RAG、向量索引、LLM 调用和凭据解析等核心逻辑。
+- `backend/app/utils/`：后端通用工具目录，例如上传处理、数学工具、错误本地化等辅助能力。
+- `backend/evals/`：Tutor 行为评测数据目录，当前用于保存 JSONL 格式的评测用例。
+- `backend/scripts/`：后端专项脚本目录，例如 Tutor 行为评测运行脚本。
+- `backend/specs/`：后端规格或需求草案预留目录，当前扫描时未发现源码文件。
+- `backend/tests/`：后端单元测试和集成测试目录，覆盖认证、API、CORS、聊天历史、RAG、LLM、仪表盘、隔离性等行为。
+
+## frontend 前端目录
+
+- `frontend/.playwright-cli/`：Playwright CLI 相关本地支持文件目录，用于浏览器自动化测试或调试。
+- `frontend/docs/`：前端专项文档目录。
+- `frontend/docs/superpowers/`：前端开发流程或计划类文档目录。
+- `frontend/docs/superpowers/plans/`：前端实现计划文档目录。
+- `frontend/docs/superpowers/specs/`：前端规格说明文档目录。
+- `frontend/scripts/`：前端辅助脚本目录，包含数学渲染、番茄钟持久化、焦点状态和审计修复验证等脚本。
+- `frontend/specs/`：前端规格或需求草案预留目录，当前扫描时未发现源码文件。
+- `frontend/src/`：前端源码主目录，包含应用入口、路由、页面、组件、功能模块、样式和工具函数。
+- `frontend/src/auth/`：前端认证模块，包含认证上下文、受保护路由和认证类型定义。
+- `frontend/src/components/`：通用和业务组件目录，例如导航栏、仪表盘组件、Tutor 工作区、数学消息、番茄钟等。
+- `frontend/src/components/figma/`：Figma 导入或设计稿适配组件预留目录，当前扫描时未发现源码文件。
+- `frontend/src/components/tutor/`：Tutor 聊天工作区的拆分组件和相关类型、计时逻辑。
+- `frontend/src/components/ui/`：基础 UI 原语目录，例如 Button、Select 和组件工具函数。
+- `frontend/src/features/`：按业务功能组织的前端逻辑目录。
+- `frontend/src/features/pomodoro/`：番茄钟功能模块，包含番茄钟上下文 Provider。
+- `frontend/src/features/tutor/`：Tutor 聊天功能模块，包含聊天状态、历史记录、资料选择和查询键等逻辑。
+- `frontend/src/guidelines/`：前端设计或实现指南目录。
+- `frontend/src/pages/`：路由页面目录，包括登录、注册、仪表盘、Tutor、模型设置等页面。
+- `frontend/src/styles/`：全局样式目录。
+- `frontend/src/utils/`：前端通用工具目录，包含 API 客户端、聊天接口、仪表盘接口、日期/时长处理、数学内容处理、Toast、设置和多个工具测试。
+
+## root scripts 目录
+
+- `scripts/`：根级 PowerShell 脚本目录，当前包含开发启动和统一测试脚本，用于从 monorepo 根目录协调前后端操作。
+
+## 本地生成或不建议手工维护的目录
+
+- `backend/.pytest_cache/`：pytest 本地缓存目录，由测试工具生成，可删除或忽略，不应提交。
+- `backend/**/__pycache__/`：Python 字节码缓存目录，由解释器生成，可删除或忽略，不应提交。
+- `backend/.venv/` 或 `backend/venv/`：Python 虚拟环境目录，如本地存在，仅用于安装依赖，不应提交。
+- `frontend/node_modules/`：前端 npm 依赖目录，如本地存在，由 `npm install` 生成，不应提交。
+- `frontend/dist/`：前端构建输出目录，如本地存在，由 `npm run build` 生成，不应提交。
+- `frontend/coverage/`：前端测试覆盖率输出目录，如本地存在，由测试工具生成，不应提交。
+

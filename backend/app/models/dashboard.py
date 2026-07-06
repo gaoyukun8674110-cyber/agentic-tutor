@@ -1,4 +1,5 @@
 """Dashboard persistence models."""
+
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
 
 from app.database import Base

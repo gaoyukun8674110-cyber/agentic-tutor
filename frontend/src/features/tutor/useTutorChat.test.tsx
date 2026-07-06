@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -19,7 +20,7 @@ vi.mock('../../utils/chatApi', async () => {
   };
 });
 
-function createWrapper() {
+function createWrapper({ strict = false } = {}) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
@@ -29,7 +30,8 @@ function createWrapper() {
   });
 
   return function Wrapper({ children }: { children: React.ReactNode }) {
-    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+    const content = <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+    return strict ? <StrictMode>{content}</StrictMode> : content;
   };
 }
 
@@ -64,6 +66,39 @@ describe('useTutorChat error localization', () => {
 
     await waitFor(() => {
       expect(result.current.errorBanner).toBe('模型服务暂时不可用 (trace trace-1)');
+    });
+  });
+
+  it('restores isSending after a StrictMode effect remount', async () => {
+    sendTutorChatMock.mockResolvedValue({
+      message: { role: 'assistant', content: 'Keep going.' },
+      provider: 'e2e',
+      model: 'mock',
+      prompt_profile: 'three_stage',
+      learning_phase: 'general',
+      credential_source: 'local',
+      credential_fingerprint: null,
+    });
+
+    const { result } = renderHook(
+      () =>
+        useTutorChat({
+          language: 'en',
+          t: (_zh, en) => en,
+          trainingMode: 'deep',
+          timerState: 'focus',
+          remainingSeconds: 60,
+          selectedMaterialIds: [],
+        }),
+      { wrapper: createWrapper({ strict: true }) },
+    );
+
+    await act(async () => {
+      await result.current.sendMessage('hello');
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSending).toBe(false);
     });
   });
 });

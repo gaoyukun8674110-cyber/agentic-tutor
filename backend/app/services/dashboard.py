@@ -1,8 +1,9 @@
 """Dashboard aggregation and persistence service."""
+
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -26,8 +27,8 @@ class DashboardService:
         duration: int,
         priority: str,
         scheduled_date: str,
-        now: Optional[datetime] = None,
-    ) -> Dict[str, Any]:
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
         timestamp = self._now(now)
         item = DashboardTask(
             user_id=user_id,
@@ -49,14 +50,14 @@ class DashboardService:
         self,
         task_id: int,
         user_id: str,
-        subject: Optional[str] = None,
-        task: Optional[str] = None,
-        duration: Optional[int] = None,
-        priority: Optional[str] = None,
-        completed: Optional[bool] = None,
-        scheduled_date: Optional[str] = None,
-        now: Optional[datetime] = None,
-    ) -> Dict[str, Any]:
+        subject: str | None = None,
+        task: str | None = None,
+        duration: int | None = None,
+        priority: str | None = None,
+        completed: bool | None = None,
+        scheduled_date: str | None = None,
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
         item = self._get_task(task_id, user_id)
         if not item:
             raise ValueError("Task not found")
@@ -89,7 +90,7 @@ class DashboardService:
         self.db.commit()
         return True
 
-    def list_tasks(self, user_id: str, scheduled_date: Optional[str] = None) -> List[Dict[str, Any]]:
+    def list_tasks(self, user_id: str, scheduled_date: str | None = None) -> list[dict[str, Any]]:
         query = self.db.query(DashboardTask).filter(DashboardTask.user_id == user_id)
         if scheduled_date:
             query = query.filter(DashboardTask.scheduled_date == scheduled_date)
@@ -103,8 +104,8 @@ class DashboardService:
         user_id: str,
         mode: str,
         duration_minutes: int,
-        completed_at: Optional[datetime] = None,
-    ) -> Dict[str, Any]:
+        completed_at: datetime | None = None,
+    ) -> dict[str, Any]:
         completed = completed_at or datetime.now()
         timestamp = completed.isoformat()
         item = PomodoroLog(
@@ -125,7 +126,7 @@ class DashboardService:
             "completed_at": item.completed_at,
         }
 
-    def get_summary(self, user_id: str, today: Optional[date] = None, days: int = 7) -> Dict[str, Any]:
+    def get_summary(self, user_id: str, today: date | None = None, days: int = 7) -> dict[str, Any]:
         current_day = today or date.today()
         window_days = max(1, min(days, 31))
         week_days = [current_day - timedelta(days=offset) for offset in range(window_days - 1, -1, -1)]
@@ -160,11 +161,9 @@ class DashboardService:
             "calendar_events": self._calendar_events(user_id, week_days[0], week_days[-1]),
         }
 
-    def _get_task(self, task_id: int, user_id: str) -> Optional[DashboardTask]:
+    def _get_task(self, task_id: int, user_id: str) -> DashboardTask | None:
         return (
-            self.db.query(DashboardTask)
-            .filter(DashboardTask.id == task_id, DashboardTask.user_id == user_id)
-            .first()
+            self.db.query(DashboardTask).filter(DashboardTask.id == task_id, DashboardTask.user_id == user_id).first()
         )
 
     def _focus_minutes_for_day(self, user_id: str, target_day: date) -> int:
@@ -236,30 +235,40 @@ class DashboardService:
         dates: set[str] = set()
         for item in self.db.query(PomodoroLog).filter(PomodoroLog.user_id == user_id).all():
             dates.add(item.completed_at[:10])
-        for item in self.db.query(DashboardTask).filter(
-            DashboardTask.user_id == user_id,
-            DashboardTask.completed_at.isnot(None),
-        ).all():
+        for item in (
+            self.db.query(DashboardTask)
+            .filter(
+                DashboardTask.user_id == user_id,
+                DashboardTask.completed_at.isnot(None),
+            )
+            .all()
+        ):
             dates.add(item.completed_at[:10])
-        for answer in self.db.query(StudentAnswer).join(Student, StudentAnswer.student_id == Student.id).filter(
-            Student.user_id == user_id
-        ).all():
+        for answer in (
+            self.db.query(StudentAnswer)
+            .join(Student, StudentAnswer.student_id == Student.id)
+            .filter(Student.user_id == user_id)
+            .all()
+        ):
             dates.add(answer.created_at[:10])
-        for session in self.db.query(TrainingSession).join(Student, TrainingSession.student_id == Student.id).filter(
-            Student.user_id == user_id,
-            TrainingSession.completed_at.isnot(None),
-        ).all():
+        for session in (
+            self.db.query(TrainingSession)
+            .join(Student, TrainingSession.student_id == Student.id)
+            .filter(
+                Student.user_id == user_id,
+                TrainingSession.completed_at.isnot(None),
+            )
+            .all()
+        ):
             dates.add(session.completed_at[:10])
-        for conversation in self.db.query(TutorConversation).filter(
-            TutorConversation.user_id == user_id
-        ).all():
+        for conversation in self.db.query(TutorConversation).filter(TutorConversation.user_id == user_id).all():
             dates.add(conversation.updated_at[:10])
         return dates
 
-    def _calendar_events(self, user_id: str, start_day: date, end_day: date) -> List[Dict[str, Any]]:
+    def _calendar_events(self, user_id: str, start_day: date, end_day: date) -> list[dict[str, Any]]:
         start, _ = self._day_bounds(start_day)
         _, end = self._day_bounds(end_day)
-        events: List[Dict[str, Any]] = []
+        events: list[dict[str, Any]] = []
 
         tasks = (
             self.db.query(DashboardTask)
@@ -309,7 +318,7 @@ class DashboardService:
 
         return events
 
-    def _task_payload(self, item: DashboardTask) -> Dict[str, Any]:
+    def _task_payload(self, item: DashboardTask) -> dict[str, Any]:
         return {
             "id": item.id,
             "user_id": item.user_id,
@@ -331,5 +340,5 @@ class DashboardService:
         return start.isoformat(), end.isoformat()
 
     @staticmethod
-    def _now(now: Optional[datetime]) -> str:
+    def _now(now: datetime | None) -> str:
         return (now or datetime.now()).isoformat()

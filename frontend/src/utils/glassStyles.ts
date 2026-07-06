@@ -41,7 +41,10 @@ export function hoverButtonStyle(tokens: ThemeTokens): CSSProperties {
   };
 }
 
-export function statusPanelStyle(tokens: ThemeTokens, tone: 'warning' | 'danger' | 'success' | 'info'): CSSProperties {
+export function statusPanelStyle(
+  tokens: ThemeTokens,
+  tone: 'warning' | 'danger' | 'success' | 'info',
+): CSSProperties {
   const colors = {
     warning: { background: tokens.warningSoft, color: tokens.warning },
     danger: { background: tokens.dangerSoft, color: tokens.danger },

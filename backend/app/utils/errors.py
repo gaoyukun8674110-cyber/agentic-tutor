@@ -1,4 +1,5 @@
 """API error helpers."""
+
 from __future__ import annotations
 
 import logging
@@ -117,7 +118,9 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
     if isinstance(detail, dict) and {"code", "user_message", "trace_id"}.issubset(detail):
         payload = {
             **detail,
-            "user_message": localize_user_message(str(detail.get("user_message", "")), request.headers.get("accept-language")),
+            "user_message": localize_user_message(
+                str(detail.get("user_message", "")), request.headers.get("accept-language")
+            ),
         }
     else:
         user_message = str(detail) if detail else "Request failed"

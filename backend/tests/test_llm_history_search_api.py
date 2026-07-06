@@ -8,6 +8,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.api.deps import get_current_user
 from app.api.llm import router as llm_router
+from app.config import settings
 from app.database import Base, get_db
 from app.models.user import User
 from app.services.chat_history import ChatHistoryService
@@ -88,6 +89,33 @@ class LlmHistorySearchApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         conversations = response.json()["conversations"]
         self.assertNotIn(created["id"], [item["id"] for item in conversations])
+
+    def test_e2e_mock_chat_persists_conversation_without_provider_credentials(self):
+        previous = settings.E2E_MOCK_LLM
+        settings.E2E_MOCK_LLM = True
+        try:
+            response = self.client.post(
+                "/api/llm/chat",
+                json={
+                    "provider": "auto",
+                    "prompt_profile": "three_stage",
+                    "messages": [{"role": "user", "content": "Explain Bayes rule"}],
+                    "tutor_context": {"mode": "focus"},
+                },
+            )
+        finally:
+            settings.E2E_MOCK_LLM = previous
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["provider"], "e2e-mock")
+        self.assertIn("conversation_id", body)
+        self.assertEqual(body["exchange_count"], 1)
+        self.assertEqual([message["role"] for message in body["messages"]], ["user", "assistant"])
+
+        history_response = self.client.get("/api/llm/conversations")
+        self.assertEqual(history_response.status_code, 200)
+        self.assertEqual(history_response.json()["conversations"][0]["id"], body["conversation_id"])
 
     def test_export_conversation_endpoint_returns_markdown(self):
         service = ChatHistoryService(self.db)

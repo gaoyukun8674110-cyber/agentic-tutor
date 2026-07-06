@@ -1,12 +1,13 @@
 """学生相关 API"""
-from fastapi import APIRouter, Depends, HTTPException
+
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+
 from app.api.deps import get_current_user, require_matching_user
 from app.database import get_db
 from app.models.user import User
-from app.services.student_model import StudentModelService
 from app.services.pomodoro import PomodoroService
+from app.services.student_model import StudentModelService
 
 router = APIRouter(prefix="/api/student", tags=["student"], dependencies=[Depends(get_current_user)])
 
@@ -21,9 +22,9 @@ def get_mastery(
     require_matching_user(user_id, current_user)
     service = StudentModelService(db)
     student = service.get_or_create_student(user_id)
-    
+
     masteries = service.get_all_masteries(student.id)
-    
+
     return {
         "user_id": user_id,
         "masteries": [
@@ -51,11 +52,11 @@ def get_recommendations(
     require_matching_user(user_id, current_user)
     service = StudentModelService(db)
     student = service.get_or_create_student(user_id)
-    
+
     target_list = target_skills.split(",") if target_skills else None
-    
+
     recommendations = service.get_recommended_skills(student.id, target_list)
-    
+
     return recommendations
 
 
@@ -69,9 +70,9 @@ def get_learning_report(
     require_matching_user(user_id, current_user)
     service = StudentModelService(db)
     student = service.get_or_create_student(user_id)
-    
+
     report = service.get_learning_report(student.id)
-    
+
     return report
 
 
@@ -87,11 +88,10 @@ def get_review_plan(
     service = StudentModelService(db)
     pomodoro = PomodoroService(db)
     student = service.get_or_create_student(user_id)
-    
+
     plan = pomodoro.get_spaced_repetition_plan(student.id, days_ahead)
-    
+
     return {
         "user_id": user_id,
         "review_plan": plan,
     }
-

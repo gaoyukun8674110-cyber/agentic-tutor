@@ -1,7 +1,9 @@
-import { Component, type ReactNode } from 'react';
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
+  onError?: (error: Error, info: ErrorInfo) => void;
+  onReset?: () => void;
 }
 
 interface ErrorBoundaryState {
@@ -17,11 +19,13 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     return { hasError: true };
   }
 
-  componentDidCatch(error: Error) {
-    console.error('Unhandled render error', error);
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('Unhandled render error', error, info.componentStack);
+    this.props.onError?.(error, info);
   }
 
   private handleReload = () => {
+    this.props.onReset?.();
     window.location.reload();
   };
 
@@ -45,7 +49,10 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             border: '1px solid var(--ai-border-strong)',
           }}
         >
-          <p className="text-sm font-medium uppercase tracking-wide" style={{ color: 'var(--ai-text-secondary)' }}>
+          <p
+            className="text-sm font-medium uppercase tracking-wide"
+            style={{ color: 'var(--ai-text-secondary)' }}
+          >
             UI Recovery
           </p>
           <h1 className="mt-3 text-2xl font-semibold">Something went wrong</h1>

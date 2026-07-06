@@ -10,8 +10,13 @@ interface UseTutorTimerOptions {
   onTimerMessage: (content: string) => void;
 }
 
-export function useTutorTimer({ language, onPomodoroLogged, onTimerMessage }: UseTutorTimerOptions) {
-  const { state, lastEvent, logVersion, resetTimer, startNextRound, toggleTimer } = usePomodoroController();
+export function useTutorTimer({
+  language,
+  onPomodoroLogged,
+  onTimerMessage,
+}: UseTutorTimerOptions) {
+  const { state, lastEvent, logVersion, resetTimer, startNextRound, toggleTimer } =
+    usePomodoroController();
   const lastSeenEventIdRef = useRef<number | null>(lastEvent?.id ?? null);
   const lastSeenLogVersionRef = useRef(logVersion);
 

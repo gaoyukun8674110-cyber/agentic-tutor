@@ -1,22 +1,26 @@
 """应用配置管理"""
+
+import logging
+import secrets
 from pathlib import Path
-from typing import Optional
 
-from pydantic_settings import BaseSettings
-
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_DATABASE_URL = f"sqlite:///{(BACKEND_DIR / 'tutor.db').as_posix()}"
+DEFAULT_DATABASE_URL = "postgresql+psycopg://tutor:tutor@localhost:55432/tutor"
+logger = logging.getLogger(__name__)
+_warned_ephemeral_jwt_secret = False
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
     """应用配置"""
-    
+
     # 数据库
     DATABASE_URL: str = DEFAULT_DATABASE_URL
-    
+
     # OpenAI
-    OPENAI_API_KEY: Optional[str] = None
+    OPENAI_API_KEY: str | None = None
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
     OPENAI_MODEL: str = "gpt-4-turbo-preview"
     OPENAI_TEMPERATURE: float = 0.7
@@ -24,15 +28,15 @@ class Settings(BaseSettings):
     DEFAULT_LLM_PROVIDER: str = "auto"
 
     # OpenAI-compatible chat providers
-    DEEPSEEK_API_KEY: Optional[str] = None
+    DEEPSEEK_API_KEY: str | None = None
     DEEPSEEK_BASE_URL: str = "https://api.deepseek.com/v1"
     DEEPSEEK_MODEL: str = "deepseek-chat"
 
-    QWEN_API_KEY: Optional[str] = None
+    QWEN_API_KEY: str | None = None
     QWEN_BASE_URL: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     QWEN_MODEL: str = "qwen-plus"
 
-    LINKAPI_API_KEY: Optional[str] = None
+    LINKAPI_API_KEY: str | None = None
     LINKAPI_BASE_URL: str = "https://api.linkapi.ai/v1"
     LINKAPI_MODEL: str = "claude-sonnet-4-20250514"
 
@@ -40,20 +44,21 @@ class Settings(BaseSettings):
     OLLAMA_MODEL: str = "llama3.1"
 
     # Per-user LLM credentials
-    LLM_CREDENTIAL_ENCRYPTION_KEY: Optional[str] = None
+    LLM_CREDENTIAL_ENCRYPTION_KEY: str | None = None
     LLM_CREDENTIAL_PREVIOUS_KEYS: str = ""
-    LLM_FINGERPRINT_HMAC_KEY: Optional[str] = None
-    ALLOW_GLOBAL_LLM_FALLBACK: bool = True
+    LLM_FINGERPRINT_HMAC_KEY: str | None = None
+    ALLOW_GLOBAL_LLM_FALLBACK: bool = False
 
     # Native provider placeholders for the next adapter iteration
-    ANTHROPIC_API_KEY: Optional[str] = None
+    ANTHROPIC_API_KEY: str | None = None
     ANTHROPIC_MODEL: str = "claude-3-5-sonnet-latest"
-    GEMINI_API_KEY: Optional[str] = None
-    GEMINI_MODEL: str = "gemini-1.5-pro"
-    
+    GEMINI_API_KEY: str | None = None
+    GEMINI_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
+    GEMINI_MODEL: str = "gemini-2.0-flash"
+
     # 应用
     DEBUG: bool = True
-    DB_AUTO_CREATE: Optional[bool] = None
+    DB_AUTO_CREATE: bool | None = None
     LOG_LEVEL: str = "INFO"
     CORS_ORIGINS: list[str] = [
         "http://localhost:4173",
@@ -64,7 +69,7 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE_MB: int = 25
 
     # Auth
-    JWT_SECRET: str = "dev-only-change-me-dev-only-change-me"
+    JWT_SECRET: str | None = None
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_TTL_SECONDS: int = 900
     REFRESH_TOKEN_TTL_SECONDS: int = 60 * 60 * 24 * 30
@@ -72,16 +77,17 @@ class Settings(BaseSettings):
     PASSWORD_MAX_LENGTH: int = 128
     COOKIE_REFRESH_NAME: str = "refresh_token"
     COOKIE_REFRESH_PATH: str = "/api/auth"
-    COOKIE_SAMESITE: str = "lax"
-    COOKIE_SECURE: bool = False
-    
+    COOKIE_SAMESITE: str = "strict"
+    COOKIE_SECURE: bool | None = None
+    E2E_MOCK_LLM: bool = False
+
     # 番茄钟
     DEFAULT_POMODORO_DURATION: int = 25  # 分钟
-    DEFAULT_BREAK_DURATION: int = 5      # 分钟
-    
+    DEFAULT_BREAK_DURATION: int = 5  # 分钟
+
     # 训练引擎
-    MAX_CONSECUTIVE_ERRORS: int = 3       # 连续错几题降难度
-    MAX_CONSECUTIVE_CORRECT: int = 3      # 连续对几题升难度
+    MAX_CONSECUTIVE_ERRORS: int = 3  # 连续错几题降难度
+    MAX_CONSECUTIVE_CORRECT: int = 3  # 连续对几题升难度
 
     # RAG / 学习资料
     RAG_UPLOAD_DIR: str = "storage/materials"
@@ -89,13 +95,26 @@ class Settings(BaseSettings):
     RAG_CHUNK_OVERLAP: int = 150
     RAG_TOP_K: int = 5
     RAG_SEARCH_CANDIDATE_LIMIT: int = 500
+    RAG_VECTOR_DIM: int = 1536
+    RAG_HNSW_EF_SEARCH: int = 40
+    # Embedding provider: "openai" (production, requires RAG_EMBEDDING_API_KEY)
+    # or "hash" (deterministic local vectors for tests/CI, no API calls).
+    RAG_EMBEDDING_MODE: str = "openai"
+    RAG_EMBEDDING_API_KEY: str | None = None
+    RAG_EMBEDDING_BASE_URL: str = "https://api.openai.com/v1"
     RAG_EMBEDDING_MODEL: str = "text-embedding-3-small"
-    RAG_HASH_EMBEDDING_DIMENSIONS: int = 128
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    RAG_HASH_EMBEDDING_DIMENSIONS: int | None = None
+
+    def model_post_init(self, __context: object) -> None:
+        global _warned_ephemeral_jwt_secret
+        if self.JWT_SECRET:
+            return
+        if not self.DEBUG:
+            raise RuntimeError("JWT_SECRET must be set in production")
+        self.JWT_SECRET = secrets.token_urlsafe(48)
+        if not _warned_ephemeral_jwt_secret:
+            logger.warning("JWT_SECRET is unset in DEBUG mode; generated an ephemeral in-memory secret")
+            _warned_ephemeral_jwt_secret = True
 
 
 settings = Settings()
-

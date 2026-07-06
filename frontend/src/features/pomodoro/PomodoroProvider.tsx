@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -82,6 +83,35 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     window.localStorage.setItem(POMODORO_STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
+  const handlePomodoroEvent = useCallback(
+    (event: PomodoroCompletionEvent, nextState: PomodoroState) => {
+      const eventId = nextEventIdRef.current++;
+
+      setState(nextState);
+      setLastEvent({ ...event, id: eventId });
+
+      if (event.focusLogMinutes > 0) {
+        void logDashboardPomodoro(event.focusLogMinutes, 'work')
+          .then(() => setLogVersion((version) => version + 1))
+          .catch(() => {
+            // Keep the shared timer usable even when persistence is temporarily unavailable.
+          });
+      }
+
+      if (
+        typeof window !== 'undefined' &&
+        'Notification' in window &&
+        Notification.permission === 'granted' &&
+        event.kind === 'focus-complete'
+      ) {
+        new Notification('Pomodoro', {
+          body: `Focus block finished. Take a ${event.breakMinutes}-minute break.`,
+        });
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -110,28 +140,11 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
         }
         return;
       }
-      const eventId = nextEventIdRef.current++;
-
-      setState(result.state);
-      setLastEvent({ ...result.event, id: eventId });
-
-      if (result.event.focusLogMinutes > 0) {
-        void logDashboardPomodoro(result.event.focusLogMinutes, 'work')
-          .then(() => setLogVersion((version) => version + 1))
-          .catch(() => {
-            // Keep the shared timer usable even when persistence is temporarily unavailable.
-          });
-      }
-
-      if ('Notification' in window && Notification.permission === 'granted' && result.event.kind === 'focus-complete') {
-        new Notification('Pomodoro', {
-          body: `Focus block finished. Take a ${result.event.breakMinutes}-minute break.`,
-        });
-      }
+      handlePomodoroEvent(result.event, result.state);
     }, 1000);
 
     return () => window.clearInterval(timer);
-  }, [state.isRunning]);
+  }, [handlePomodoroEvent, state.isRunning]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -140,9 +153,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
       if (document.visibilityState !== 'visible') return;
       const result = reconcilePomodoroState(latestStateRef.current, Date.now());
       if (result.event) {
-        const eventId = nextEventIdRef.current++;
-        setState(result.state);
-        setLastEvent({ ...result.event, id: eventId });
+        handlePomodoroEvent(result.event, result.state);
         return;
       }
 
@@ -153,7 +164,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
 
     document.addEventListener('visibilitychange', reconcileVisibleTimer);
     return () => document.removeEventListener('visibilitychange', reconcileVisibleTimer);
-  }, []);
+  }, [handlePomodoroEvent]);
 
   const value = useMemo<PomodoroContextValue>(
     () => ({
@@ -177,7 +188,8 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
       resetTimer: () => setState((previous) => resetPomodoroState(previous)),
       startNextRound: () => setState((previous) => startNextPomodoroRound(previous, Date.now())),
       switchMode: (mode) => setState((previous) => switchPomodoroMode(previous, mode)),
-      adjustDuration: (mode, increment) => setState((previous) => adjustPomodoroDuration(previous, mode, increment)),
+      adjustDuration: (mode, increment) =>
+        setState((previous) => adjustPomodoroDuration(previous, mode, increment)),
     }),
     [lastEvent, logVersion, state],
   );

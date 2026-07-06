@@ -1,4 +1,14 @@
-import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { useMemo } from 'react';
 import { BookOpen, Clock, Target, TimerReset, TrendingUp } from 'lucide-react';
 import type { DashboardWeekDay } from '../utils/dashboardApi';
@@ -46,7 +56,7 @@ export function StudyStats({
   const weeklyData = useMemo(
     () =>
       persistedWeeklyData.length > 0
-          ? persistedWeeklyData.map((item) => {
+        ? persistedWeeklyData.map((item) => {
             const parsedDate = parseLocalDateKey(item.date);
             const dayKey = jsDayToKey[parsedDate.getDay()] || todayKey;
             return {
@@ -100,7 +110,10 @@ export function StudyStats({
   ];
 
   return (
-    <div className="rounded-2xl overflow-hidden shadow-sm transition-all duration-300" style={cardStyle}>
+    <div
+      className="rounded-2xl overflow-hidden shadow-sm transition-all duration-300"
+      style={cardStyle}
+    >
       <div className="p-6 border-b" style={sectionStyle}>
         <div className="flex items-center gap-2">
           <div className="p-2 rounded-xl" style={sectionStyle}>
@@ -133,15 +146,25 @@ export function StudyStats({
         </div>
 
         <div className="rounded-2xl p-4" style={sectionStyle}>
-          <h3 className="text-sm font-medium mb-4 flex items-center gap-2" style={{ color: tokens.textPrimary }}>
+          <h3
+            className="text-sm font-medium mb-4 flex items-center gap-2"
+            style={{ color: tokens.textPrimary }}
+          >
             <Clock className="h-4 w-4" style={{ color: tokens.accentPrimary }} />
             {t('本周学习时长趋势', 'Weekly time')}
           </h3>
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={weeklyData}>
               <CartesianGrid strokeDasharray="3 3" stroke={tokens.chartGrid} opacity={0.25} />
-              <XAxis dataKey="day" tick={{ fill: tokens.textSecondary, fontSize: 12 }} axisLine={{ stroke: tokens.chartAxis, opacity: 0.25 }} />
-              <YAxis tick={{ fill: tokens.textSecondary, fontSize: 12 }} axisLine={{ stroke: tokens.chartAxis, opacity: 0.25 }} />
+              <XAxis
+                dataKey="day"
+                tick={{ fill: tokens.textSecondary, fontSize: 12 }}
+                axisLine={{ stroke: tokens.chartAxis, opacity: 0.25 }}
+              />
+              <YAxis
+                tick={{ fill: tokens.textSecondary, fontSize: 12 }}
+                axisLine={{ stroke: tokens.chartAxis, opacity: 0.25 }}
+              />
               <Tooltip
                 contentStyle={{
                   backgroundColor: tokens.chartTooltipBg,
@@ -151,21 +174,39 @@ export function StudyStats({
                   fontSize: '12px',
                 }}
               />
-              <Line type="monotone" dataKey="hours" stroke={tokens.accentPrimary} strokeWidth={3} dot={{ fill: tokens.accentPrimary, r: 4 }} activeDot={{ r: 6 }} />
+              <Line
+                type="monotone"
+                dataKey="hours"
+                stroke={tokens.accentPrimary}
+                strokeWidth={3}
+                dot={{ fill: tokens.accentPrimary, r: 4 }}
+                activeDot={{ r: 6 }}
+              />
             </LineChart>
           </ResponsiveContainer>
         </div>
 
         <div className="rounded-2xl p-4" style={sectionStyle}>
-          <h3 className="text-sm font-medium mb-4 flex items-center gap-2" style={{ color: tokens.textPrimary }}>
+          <h3
+            className="text-sm font-medium mb-4 flex items-center gap-2"
+            style={{ color: tokens.textPrimary }}
+          >
             <Target className="h-4 w-4" style={{ color: tokens.accentSecondary }} />
             {t('每日任务完成数', 'Tasks per day')}
           </h3>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={weeklyData}>
               <CartesianGrid strokeDasharray="3 3" stroke={tokens.chartGrid} opacity={0.25} />
-              <XAxis dataKey="day" tick={{ fill: tokens.textSecondary, fontSize: 12 }} axisLine={{ stroke: tokens.chartAxis, opacity: 0.25 }} />
-              <YAxis allowDecimals={false} tick={{ fill: tokens.textSecondary, fontSize: 12 }} axisLine={{ stroke: tokens.chartAxis, opacity: 0.25 }} />
+              <XAxis
+                dataKey="day"
+                tick={{ fill: tokens.textSecondary, fontSize: 12 }}
+                axisLine={{ stroke: tokens.chartAxis, opacity: 0.25 }}
+              />
+              <YAxis
+                allowDecimals={false}
+                tick={{ fill: tokens.textSecondary, fontSize: 12 }}
+                axisLine={{ stroke: tokens.chartAxis, opacity: 0.25 }}
+              />
               <Tooltip
                 contentStyle={{
                   backgroundColor: tokens.chartTooltipBg,

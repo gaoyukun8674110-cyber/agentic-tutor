@@ -1,7 +1,7 @@
-import unittest
 import importlib.util
 import sys
 import types
+import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -149,6 +149,22 @@ class FailingOpenAIClient:
         FailingOpenAIClient.instances.append(self)
 
 
+class NoneContentCompletions(FakeCompletions):
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        return FakeCompletion(None)
+
+
+class NoneContentOpenAIClient:
+    instances = []
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+        self.chat = FakeChat()
+        self.chat.completions = NoneContentCompletions()
+        NoneContentOpenAIClient.instances.append(self)
+
+
 class LLMChatTests(unittest.TestCase):
     def setUp(self):
         FakeOpenAIClient.instances = []
@@ -255,9 +271,10 @@ class LLMChatTests(unittest.TestCase):
     def test_chat_composes_prompt_profile_and_calls_selected_openai_compatible_provider(self):
         service = LLMService()
 
-        with patch.object(llm_module, "OpenAI", FakeOpenAIClient), patch.object(
-            llm_module, "settings"
-        ) as fake_settings:
+        with (
+            patch.object(llm_module, "OpenAI", FakeOpenAIClient),
+            patch.object(llm_module, "settings") as fake_settings,
+        ):
             fake_settings.OPENAI_API_KEY = "secret-openai"
             fake_settings.OPENAI_BASE_URL = "https://api.openai.com/v1"
             fake_settings.OPENAI_MODEL = "gpt-4o-mini"
@@ -300,7 +317,6 @@ class LLMChatTests(unittest.TestCase):
         self.assertIn("苏格拉底", call["messages"][0]["content"])
         self.assertIn("一次方程训练", call["messages"][0]["content"])
 
-
     def _configure_fake_settings(self, fake_settings):
         fake_settings.OPENAI_API_KEY = "secret-openai"
         fake_settings.OPENAI_BASE_URL = "https://api.openai.com/v1"
@@ -327,7 +343,10 @@ class LLMChatTests(unittest.TestCase):
     def test_chat_reuses_provider_client_for_same_provider(self):
         service = LLMService()
 
-        with patch.object(llm_module, "OpenAI", FakeOpenAIClient), patch.object(llm_module, "settings") as fake_settings:
+        with (
+            patch.object(llm_module, "OpenAI", FakeOpenAIClient),
+            patch.object(llm_module, "settings") as fake_settings,
+        ):
             self._configure_fake_settings(fake_settings)
             for _ in range(2):
                 service.chat(
@@ -342,7 +361,10 @@ class LLMChatTests(unittest.TestCase):
     def test_chat_sanitizes_provider_exception(self):
         service = LLMService()
 
-        with patch.object(llm_module, "OpenAI", FailingOpenAIClient), patch.object(llm_module, "settings") as fake_settings:
+        with (
+            patch.object(llm_module, "OpenAI", FailingOpenAIClient),
+            patch.object(llm_module, "settings") as fake_settings,
+        ):
             self._configure_fake_settings(fake_settings)
             result = service.chat(
                 provider="deepseek",
@@ -353,6 +375,37 @@ class LLMChatTests(unittest.TestCase):
 
         self.assertEqual(result["error"]["code"], "llm_provider_error")
         self.assertNotIn("sk-secret", str(result))
+
+    def test_complete_chat_sets_timeout_and_normalizes_empty_provider_content(self):
+        service = LLMService()
+        resolved = SimpleNamespace(
+            provider_id="deepseek",
+            api_key="secret-deepseek",
+            base_url="https://api.deepseek.com/v1",
+            default_model="deepseek-chat",
+            source="user",
+            fingerprint="fingerprint",
+        )
+
+        with (
+            patch.object(llm_module, "OpenAI", NoneContentOpenAIClient),
+            patch.object(llm_module, "settings") as fake_settings,
+        ):
+            self._configure_fake_settings(fake_settings)
+            result = service.complete_chat(
+                resolved=resolved,
+                model=None,
+                messages=[{"role": "user", "content": "hello"}],
+                prompt_profile="socratic",
+                agent_type="tutor_chat:socratic:deepseek",
+                user_id="alice",
+                session_id=None,
+                analytics=None,
+            )
+
+        self.assertEqual(result["message"]["content"], "")
+        call = NoneContentOpenAIClient.instances[0].chat.completions.calls[0]
+        self.assertEqual(call["timeout"], 60)
 
     def test_safe_log_llm_call_uses_warning_logger_when_analytics_fails(self):
         analytics = SimpleNamespace(
@@ -371,7 +424,6 @@ class LLMChatTests(unittest.TestCase):
             )
 
         fake_logger.warning.assert_called_once()
-
 
 
 if __name__ == "__main__":

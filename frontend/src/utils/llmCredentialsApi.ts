@@ -31,8 +31,13 @@ export interface PatchLLMCredentialPayload {
   is_enabled?: boolean;
 }
 
-export async function fetchLlmCredentials(options?: ApiRequestOptions): Promise<UserLLMCredential[]> {
-  const data = await apiFetch<{ credentials: UserLLMCredential[] }>('/api/llm/credentials', options);
+export async function fetchLlmCredentials(
+  options?: ApiRequestOptions,
+): Promise<UserLLMCredential[]> {
+  const data = await apiFetch<{ credentials: UserLLMCredential[] }>(
+    '/api/llm/credentials',
+    options,
+  );
   return data.credentials;
 }
 
@@ -41,11 +46,14 @@ export async function saveLlmCredential(
   payload: SaveLLMCredentialPayload,
   options?: ApiRequestOptions,
 ): Promise<UserLLMCredential> {
-  const data = await apiFetch<{ credential: UserLLMCredential }>(`/api/llm/credentials/${providerId}`, {
-    ...options,
-    method: 'PUT',
-    body: JSON.stringify(payload),
-  });
+  const data = await apiFetch<{ credential: UserLLMCredential }>(
+    `/api/llm/credentials/${providerId}`,
+    {
+      ...options,
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    },
+  );
   return data.credential;
 }
 
@@ -57,11 +65,14 @@ export async function patchLlmCredential(
   if ('api_key' in (payload as Record<string, unknown>)) {
     throw new Error('API key updates must use saveLlmCredential');
   }
-  const data = await apiFetch<{ credential: UserLLMCredential }>(`/api/llm/credentials/${providerId}`, {
-    ...options,
-    method: 'PATCH',
-    body: JSON.stringify(payload),
-  });
+  const data = await apiFetch<{ credential: UserLLMCredential }>(
+    `/api/llm/credentials/${providerId}`,
+    {
+      ...options,
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    },
+  );
   return data.credential;
 }
 

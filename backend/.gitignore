@@ -49,3 +49,6 @@ storage/materials/
 .coverage
 htmlcov/
 
+# Docker 镜像导出产物
+*.tar
+*.tar.gz

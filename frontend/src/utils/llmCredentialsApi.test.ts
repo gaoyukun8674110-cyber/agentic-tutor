@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { deleteLlmCredential, fetchLlmCredentials, patchLlmCredential, saveLlmCredential } from './llmCredentialsApi';
+import {
+  deleteLlmCredential,
+  fetchLlmCredentials,
+  patchLlmCredential,
+  saveLlmCredential,
+} from './llmCredentialsApi';
 
 describe('llmCredentialsApi', () => {
   afterEach(() => {
@@ -40,7 +45,9 @@ describe('llmCredentialsApi', () => {
 
   it('patches metadata without accepting an api_key field', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ credential: { provider_id: 'openai', configured: true } }), { status: 200 }),
+      new Response(JSON.stringify({ credential: { provider_id: 'openai', configured: true } }), {
+        status: 200,
+      }),
     );
 
     await expect(

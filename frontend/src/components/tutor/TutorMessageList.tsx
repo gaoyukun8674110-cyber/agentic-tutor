@@ -15,7 +15,14 @@ interface TutorMessageListProps {
   t: <T extends string>(zh: T, en: T) => T;
 }
 
-export function TutorMessageList({ messages, materialContext, isSending, language, tokens, t }: TutorMessageListProps) {
+export function TutorMessageList({
+  messages,
+  materialContext,
+  isSending,
+  language,
+  tokens,
+  t,
+}: TutorMessageListProps) {
   const chunks = materialContext?.chunks ?? [];
   const credentialLabel = (message: ChatMessage) => {
     if (message.credentialSource === 'user') return t('你的 Key', 'Your key');
@@ -44,12 +51,18 @@ export function TutorMessageList({ messages, materialContext, isSending, languag
               }}
             >
               {(message.label || message.credentialSource) && !isUser && (
-                <div className="mb-2 flex flex-wrap items-center gap-2 text-xs font-medium" style={{ color: tokens.textSecondary }}>
+                <div
+                  className="mb-2 flex flex-wrap items-center gap-2 text-xs font-medium"
+                  style={{ color: tokens.textSecondary }}
+                >
                   {message.label && <span>{message.label}</span>}
                   {credentialLabel(message) && (
                     <span
                       className="rounded-full border px-2 py-0.5"
-                      style={{ borderColor: 'var(--ai-border-subtle)', background: tokens.surfaceMuted }}
+                      style={{
+                        borderColor: 'var(--ai-border-subtle)',
+                        background: tokens.surfaceMuted,
+                      }}
                     >
                       {credentialLabel(message)}
                     </span>
@@ -65,7 +78,11 @@ export function TutorMessageList({ messages, materialContext, isSending, languag
       {chunks.length > 0 && (
         <div
           className="rounded-2xl px-4 py-3 text-sm"
-          style={{ background: tokens.sourceSurface, border: tokens.sourceBorder, color: tokens.sourceText }}
+          style={{
+            background: tokens.sourceSurface,
+            border: tokens.sourceBorder,
+            color: tokens.sourceText,
+          }}
         >
           <div
             className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-normal"
@@ -77,10 +94,16 @@ export function TutorMessageList({ messages, materialContext, isSending, languag
           <div className="space-y-2">
             {chunks.slice(0, 3).map((chunk, index) => (
               <div key={`${chunk.material_id}-${chunk.chunk_id ?? index}`} className="min-w-0">
-                <div className="truncate text-xs font-medium" style={{ color: tokens.accentPrimary }}>
+                <div
+                  className="truncate text-xs font-medium"
+                  style={{ color: tokens.accentPrimary }}
+                >
                   {chunk.source_label}
                 </div>
-                <div className="line-clamp-2 text-xs leading-5" style={{ color: tokens.textSecondary }}>
+                <div
+                  className="line-clamp-2 text-xs leading-5"
+                  style={{ color: tokens.textSecondary }}
+                >
                   {chunk.content}
                 </div>
               </div>

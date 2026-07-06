@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchStudyMaterials, uploadStudyMaterial, type StudyMaterial } from '../../utils/chatApi';
 import { getUserFacingError } from '../../utils/apiClient';
@@ -10,12 +10,45 @@ export function useTutorMaterials() {
   const [selectedMaterialIds, setSelectedMaterialIds] = useState<number[]>([]);
   const [materialError, setMaterialError] = useState<string | null>(null);
   const userTouchedMaterialsRef = useRef(false);
+  const pollingIntervalRef = useRef<number | null>(null);
 
   const materialsQuery = useQuery({
     queryKey: tutorQueryKeys.materials(),
     queryFn: ({ signal }) => fetchStudyMaterials({ signal }),
     retry: false,
   });
+
+  const stopMaterialPolling = useCallback(() => {
+    if (pollingIntervalRef.current !== null) {
+      window.clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+  }, []);
+
+  const startMaterialPolling = useCallback(
+    (materialId: number) => {
+      if (typeof window === 'undefined') return;
+      stopMaterialPolling();
+      pollingIntervalRef.current = window.setInterval(() => {
+        void queryClient
+          .fetchQuery({
+            queryKey: tutorQueryKeys.materials(),
+            queryFn: () => fetchStudyMaterials(),
+          })
+          .then((items) => {
+            const current = items.find((item) => item.id === materialId);
+            if (current?.status === 'ready' || current?.status === 'failed') {
+              stopMaterialPolling();
+            }
+          })
+          .catch(() => {
+            stopMaterialPolling();
+          });
+      }, 2000);
+    },
+    [queryClient, stopMaterialPolling],
+  );
+
   const uploadStudyMaterialMutation = useMutation({
     mutationFn: (file: File) => uploadStudyMaterial(file),
     onSuccess: (material) => {
@@ -26,6 +59,9 @@ export function useTutorMaterials() {
       userTouchedMaterialsRef.current = true;
       setSelectedMaterialIds((ids) => Array.from(new Set([...ids, material.id])));
       setMaterialError(null);
+      if (material.status === 'pending') {
+        startMaterialPolling(material.id);
+      }
     },
     onError: (error) => {
       setMaterialError(getUserFacingError(error));
@@ -44,6 +80,13 @@ export function useTutorMaterials() {
       return deriveSelectedMaterialIds(materialIds, ids, userTouchedMaterialsRef.current);
     });
   }, [materials]);
+
+  useEffect(
+    () => () => {
+      stopMaterialPolling();
+    },
+    [stopMaterialPolling],
+  );
 
   const toggleMaterialSelection = (materialId: number) => {
     userTouchedMaterialsRef.current = true;

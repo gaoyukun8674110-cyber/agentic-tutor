@@ -61,7 +61,12 @@ export function DashboardPage() {
     {
       icon: Brain,
       label: t('连续学习', 'Learning streak'),
-      value: streakDays > 0 ? (language === 'zh' ? `${streakDays} 天` : `${streakDays} days`) : t('0 天', '0 days'),
+      value:
+        streakDays > 0
+          ? language === 'zh'
+            ? `${streakDays} 天`
+            : `${streakDays} days`
+          : t('0 天', '0 days'),
     },
   ];
 
@@ -84,14 +89,20 @@ export function DashboardPage() {
               {item.value}
             </p>
           </div>
-          <Icon className="h-10 w-10 shrink-0" style={{ color: tokens.textPrimary, opacity: 0.8 }} />
+          <Icon
+            className="h-10 w-10 shrink-0"
+            style={{ color: tokens.textPrimary, opacity: 0.8 }}
+          />
         </div>
       </div>
     );
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden" style={{ ...textStyle, color: tokens.textPrimary }}>
+    <div
+      className="relative min-h-screen overflow-hidden"
+      style={{ ...textStyle, color: tokens.textPrimary }}
+    >
       <div className="fixed inset-0" style={{ background: tokens.pageGradient }} />
       <div className="fixed inset-0" style={{ background: tokens.overlayGradient }} />
       <TopNavbar />
@@ -111,10 +122,7 @@ export function DashboardPage() {
 
             <section className="space-y-6">
               {renderStatCard(stats[1])}
-              <TodayPlan
-                tasks={dashboardSummary?.tasks ?? []}
-                onDataChange={refreshDashboard}
-              />
+              <TodayPlan tasks={dashboardSummary?.tasks ?? []} onDataChange={refreshDashboard} />
             </section>
 
             <section className="space-y-6">

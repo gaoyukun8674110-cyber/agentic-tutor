@@ -1,15 +1,16 @@
 """LLM 服务 - 统一模型管理、多角色 Agent、工具集成"""
-import json
+
 import logging
 import time
 from threading import Lock
-from typing import TYPE_CHECKING, Optional, Dict, Any, List
+from typing import TYPE_CHECKING, Any
+
 from openai import OpenAI
+
 from app.config import settings
 from app.services.analytics import AnalyticsService
-from app.utils.math_tools import MathTools
 from app.utils.errors import safe_llm_error
-
+from app.utils.math_tools import MathTools
 
 logger = logging.getLogger(__name__)
 
@@ -26,36 +27,37 @@ MATH_RENDERING_RULES = """数学公式输出规则：
 
 class LLMService:
     """LLM 服务"""
-    
-    def __init__(self, analytics: Optional[AnalyticsService] = None):
-        self.client = OpenAI(
-            api_key=settings.OPENAI_API_KEY,
-            base_url=settings.OPENAI_BASE_URL,
-        ) if settings.OPENAI_API_KEY else None
+
+    def __init__(self, analytics: AnalyticsService | None = None):
+        self.client = (
+            OpenAI(
+                api_key=settings.OPENAI_API_KEY,
+                base_url=settings.OPENAI_BASE_URL,
+            )
+            if settings.OPENAI_API_KEY
+            else None
+        )
         self.analytics = analytics
         self.math_tools = MathTools()
-        self._clients: Dict[str, OpenAI] = {}
+        self._clients: dict[str, OpenAI] = {}
         self._client_lock = Lock()
-        
+
         # Agent 角色定义
         self.agent_prompts = {
             "solver": """你是一个数学解题助手。你的任务是：
 1. 使用提供的数学工具（Sympy）来验证和计算
 2. 给出结构化的解题步骤
 3. 确保答案的准确性""",
-            
             "tutor": """你是一个苏格拉底式的数学导师。你的任务是：
 1. 不直接给答案，而是通过提问引导学生思考
 2. 给出提示（hint），而不是完整解答
 3. 用通俗易懂的语言解释数学概念
 4. 鼓励学生，保持耐心和友好""",
-            
             "diagnosis": """你是一个错误诊断专家。你的任务是：
 1. 对比学生的答案和标准答案
 2. 找出学生错误的具体位置和原因
 3. 解释为什么错了，以及正确的思路是什么
 4. 给出针对性的改进建议""",
-            
             "pomodoro_coach": """你是一个学习教练。你的任务是：
 1. 在番茄钟开始和结束时给出鼓励性的话语
 2. 总结学习成果，给出正面反馈
@@ -132,7 +134,7 @@ class LLMService:
             },
         }
 
-    def _provider_configs(self) -> Dict[str, Dict[str, Any]]:
+    def _provider_configs(self) -> dict[str, dict[str, Any]]:
         """Return backend-only provider configuration."""
         return {
             "openai": {
@@ -202,23 +204,21 @@ class LLMService:
             },
             "gemini": {
                 "name": "Google Gemini",
-                "adapter": "native",
+                "adapter": "openai-compatible",
                 "api_key": settings.GEMINI_API_KEY,
-                "base_url": None,
+                "base_url": settings.GEMINI_BASE_URL,
                 "default_model": settings.GEMINI_MODEL,
-                "models": [settings.GEMINI_MODEL],
+                "models": [settings.GEMINI_MODEL, "gemini-2.5-pro", "gemini-2.5-flash", "gemini-1.5-pro"],
                 "requires_api_key": True,
-                "implemented": False,
+                "implemented": True,
             },
         }
 
-    def get_provider_metadata(self) -> Dict[str, Any]:
+    def get_provider_metadata(self) -> dict[str, Any]:
         """Expose safe provider metadata to the frontend without API keys."""
         providers = []
         for provider_id, config in self._provider_configs().items():
-            has_credentials = bool(config["base_url"]) and (
-                not config["requires_api_key"] or bool(config["api_key"])
-            )
+            has_credentials = bool(config["base_url"]) and (not config["requires_api_key"] or bool(config["api_key"]))
             enabled = has_credentials and config["implemented"]
             reason = None
             if not has_credentials:
@@ -241,7 +241,7 @@ class LLMService:
 
         return {"providers": providers}
 
-    def get_prompt_profiles(self) -> Dict[str, Any]:
+    def get_prompt_profiles(self) -> dict[str, Any]:
         """Return available Tutor teaching styles."""
         return {
             "profiles": [
@@ -254,12 +254,12 @@ class LLMService:
             ]
         }
 
-    def _has_provider_credentials(self, config: Dict[str, Any]) -> bool:
-        return bool(config["base_url"]) and (
-            not config["requires_api_key"] or bool(config["api_key"])
-        )
+    def _has_provider_credentials(self, config: dict[str, Any]) -> bool:
+        return bool(config["base_url"]) and (not config["requires_api_key"] or bool(config["api_key"]))
 
-    def _resolve_provider_id(self, requested_provider: Optional[str], provider_configs: Dict[str, Dict[str, Any]]) -> Optional[str]:
+    def _resolve_provider_id(
+        self, requested_provider: str | None, provider_configs: dict[str, dict[str, Any]]
+    ) -> str | None:
         provider_id = requested_provider or "auto"
         if provider_id != "auto":
             return provider_id
@@ -278,14 +278,14 @@ class LLMService:
         return None
 
     @staticmethod
-    def _latest_user_content(messages: List[Dict[str, str]]) -> str:
+    def _latest_user_content(messages: list[dict[str, str]]) -> str:
         for message in reversed(messages):
             if message.get("role") == "user" and message.get("content", "").strip():
                 return message.get("content", "").strip()
         return ""
 
     @staticmethod
-    def detect_learning_phase(student_message: Optional[str]) -> str:
+    def detect_learning_phase(student_message: str | None) -> str:
         text = (student_message or "").strip().lower()
         if not text:
             return "general"
@@ -343,7 +343,7 @@ class LLMService:
         return instructions.get(phase, instructions["general"])
 
     @staticmethod
-    def _format_material_context(material_context: Any) -> List[str]:
+    def _format_material_context(material_context: Any) -> list[str]:
         if not isinstance(material_context, dict):
             return []
 
@@ -365,7 +365,7 @@ class LLMService:
                 continue
             source_label = str(chunk.get("source_label") or chunk.get("filename") or f"学习资料片段 {index}")
             score = chunk.get("score")
-            score_text = f" · score {float(score):.3f}" if isinstance(score, (int, float)) else ""
+            score_text = f" · score {float(score):.3f}" if isinstance(score, int | float) else ""
             lines.append(f"[{index}] {source_label}{score_text}")
             lines.append(content)
             included += 1
@@ -375,8 +375,8 @@ class LLMService:
     def _build_system_prompt(
         self,
         prompt_profile: str,
-        tutor_context: Optional[Dict[str, Any]] = None,
-        system_prompt_override: Optional[str] = None,
+        tutor_context: dict[str, Any] | None = None,
+        system_prompt_override: str | None = None,
     ) -> str:
         profile = self.prompt_profiles.get(prompt_profile, self.prompt_profiles["socratic"])
         if prompt_profile == "custom" and system_prompt_override:
@@ -408,9 +408,9 @@ class LLMService:
     def _build_chat_messages(
         self,
         system_prompt: str,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         inline_system_prompt: bool = False,
-    ) -> List[Dict[str, str]]:
+    ) -> list[dict[str, str]]:
         user_messages = [
             {
                 "role": message.get("role", "user"),
@@ -429,20 +429,19 @@ class LLMService:
         first_message = user_messages[0]
         first_message["role"] = "user"
         first_message["content"] = (
-            f"请严格遵循以下 Tutor 行为规则：\n{system_prompt}\n\n"
-            f"学生消息：\n{first_message['content']}"
+            f"请严格遵循以下 Tutor 行为规则：\n{system_prompt}\n\n" f"学生消息：\n{first_message['content']}"
         )
         return user_messages
 
     def _safe_log_llm_call(
         self,
-        user_id: Optional[str],
-        session_id: Optional[int],
+        user_id: str | None,
+        session_id: int | None,
         agent_type: str,
         prompt_length: int,
         response_length: int,
         duration_ms: float,
-        analytics: Optional[AnalyticsService] = None,
+        analytics: AnalyticsService | None = None,
     ) -> None:
         analytics_service = analytics or self.analytics
         if not analytics_service:
@@ -460,7 +459,7 @@ class LLMService:
         except Exception as error:
             logger.warning("LLM analytics log failed: %s", error, exc_info=error)
 
-    def _get_provider_client(self, provider: str, provider_config: Dict[str, Any]) -> OpenAI:
+    def _get_provider_client(self, provider: str, provider_config: dict[str, Any]) -> OpenAI:
         client = self._clients.get(provider)
         if client is None:
             with self._client_lock:
@@ -476,19 +475,19 @@ class LLMService:
     def complete_chat(
         self,
         resolved: "ResolvedProvider",
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         *,
-        max_tokens: Optional[int] = None,
-        temperature: Optional[float] = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
         prompt_profile: str = "three_stage",
-        system_prompt_override: Optional[str] = None,
-        tutor_context: Optional[Dict[str, Any]] = None,
+        system_prompt_override: str | None = None,
+        tutor_context: dict[str, Any] | None = None,
         agent_type: str,
-        user_id: Optional[str],
-        session_id: Optional[int],
-        analytics: Optional[AnalyticsService],
-        model: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        user_id: str | None,
+        session_id: int | None,
+        analytics: AnalyticsService | None,
+        model: str | None = None,
+    ) -> dict[str, Any]:
         """Generate a reply using an already resolved user/global provider."""
         selected_model = model or resolved.default_model
         detected_learning_phase = self.detect_learning_phase(self._latest_user_content(messages))
@@ -513,6 +512,7 @@ class LLMService:
         )
 
         start_time = time.time()
+        client = None
         try:
             client = OpenAI(api_key=resolved.api_key, base_url=resolved.base_url)
             response = client.chat.completions.create(
@@ -520,8 +520,9 @@ class LLMService:
                 messages=chat_messages,
                 temperature=temperature if temperature is not None else settings.OPENAI_TEMPERATURE,
                 max_tokens=max_tokens if max_tokens is not None else settings.OPENAI_MAX_TOKENS,
+                timeout=60,
             )
-            content = response.choices[0].message.content
+            content = response.choices[0].message.content or ""
             duration_ms = (time.time() - start_time) * 1000
             usage = getattr(response, "usage", None)
             usage_payload = {}
@@ -555,19 +556,23 @@ class LLMService:
             }
         except Exception as e:
             return {"error": safe_llm_error(e)}
+        finally:
+            close = getattr(client, "close", None)
+            if callable(close):
+                close()
 
     def chat(
         self,
         provider: str,
-        model: Optional[str],
-        messages: List[Dict[str, str]],
+        model: str | None,
+        messages: list[dict[str, str]],
         prompt_profile: str = "three_stage",
-        tutor_context: Optional[Dict[str, Any]] = None,
-        system_prompt_override: Optional[str] = None,
-        user_id: Optional[str] = None,
-        session_id: Optional[int] = None,
-        analytics: Optional[AnalyticsService] = None,
-    ) -> Dict[str, Any]:
+        tutor_context: dict[str, Any] | None = None,
+        system_prompt_override: str | None = None,
+        user_id: str | None = None,
+        session_id: int | None = None,
+        analytics: AnalyticsService | None = None,
+    ) -> dict[str, Any]:
         """Generate a Tutor chat reply through the selected provider."""
         provider_configs = self._provider_configs()
         provider = self._resolve_provider_id(provider, provider_configs)
@@ -651,20 +656,20 @@ class LLMService:
             }
         except Exception as e:
             return {"error": safe_llm_error(e)}
-    
+
     def generate_hint(
         self,
         question_content: str,
-        student_answer: Optional[str] = None,
+        student_answer: str | None = None,
         step: int = 1,
-        user_id: Optional[str] = None,
-        session_id: Optional[int] = None,
-        analytics: Optional[AnalyticsService] = None,
-    ) -> Dict[str, Any]:
+        user_id: str | None = None,
+        session_id: int | None = None,
+        analytics: AnalyticsService | None = None,
+    ) -> dict[str, Any]:
         """生成提示（hint）"""
         if not self.client:
             return {"error": "OpenAI API key not configured"}
-        
+
         prompt = f"""题目：{question_content}
 
 学生当前答案：{student_answer if student_answer else "尚未作答"}
@@ -673,7 +678,7 @@ class LLMService:
 1. 引导学生思考下一步应该做什么
 2. 用提问的方式，而不是陈述
 3. 简短、精准，不超过 50 字"""
-        
+
         start_time = time.time()
         try:
             response = self.client.chat.completions.create(
@@ -685,11 +690,11 @@ class LLMService:
                 temperature=0.7,
                 max_tokens=200,
             )
-            
+
             hint = response.choices[0].message.content
-            
+
             duration_ms = (time.time() - start_time) * 1000
-            
+
             # 记录日志
             self._safe_log_llm_call(
                 user_id=user_id,
@@ -700,7 +705,7 @@ class LLMService:
                 duration_ms=duration_ms,
                 analytics=analytics,
             )
-            
+
             return {
                 "hint": hint,
                 "step": step,
@@ -708,25 +713,25 @@ class LLMService:
             }
         except Exception as e:
             return {"error": safe_llm_error(e)}
-    
+
     def explain_solution(
         self,
         question_content: str,
         standard_solution: str,
-        solution_steps: Optional[List[Dict]] = None,
-        user_id: Optional[str] = None,
-        session_id: Optional[int] = None,
-        analytics: Optional[AnalyticsService] = None,
-    ) -> Dict[str, Any]:
+        solution_steps: list[dict] | None = None,
+        user_id: str | None = None,
+        session_id: int | None = None,
+        analytics: AnalyticsService | None = None,
+    ) -> dict[str, Any]:
         """讲解标准解"""
         if not self.client:
             return {"error": "OpenAI API key not configured"}
-        
+
         steps_text = ""
         if solution_steps:
             for i, step in enumerate(solution_steps, 1):
                 steps_text += f"\n步骤 {i}: {step.get('description', '')}"
-        
+
         prompt = f"""题目：{question_content}
 
 标准答案：{standard_solution}
@@ -736,7 +741,7 @@ class LLMService:
 1. 解题思路
 2. 关键步骤的解释
 3. 为什么这样做"""
-        
+
         start_time = time.time()
         try:
             response = self.client.chat.completions.create(
@@ -748,11 +753,11 @@ class LLMService:
                 temperature=0.7,
                 max_tokens=500,
             )
-            
+
             explanation = response.choices[0].message.content
-            
+
             duration_ms = (time.time() - start_time) * 1000
-            
+
             self._safe_log_llm_call(
                 user_id=user_id,
                 session_id=session_id,
@@ -762,31 +767,31 @@ class LLMService:
                 duration_ms=duration_ms,
                 analytics=analytics,
             )
-            
+
             return {
                 "explanation": explanation,
                 "agent_type": "tutor",
             }
         except Exception as e:
             return {"error": safe_llm_error(e)}
-    
+
     def diagnose_error(
         self,
         question_content: str,
         student_answer: str,
         correct_answer: str,
         standard_solution: str,
-        user_id: Optional[str] = None,
-        session_id: Optional[int] = None,
-        analytics: Optional[AnalyticsService] = None,
-    ) -> Dict[str, Any]:
+        user_id: str | None = None,
+        session_id: int | None = None,
+        analytics: AnalyticsService | None = None,
+    ) -> dict[str, Any]:
         """诊断错误"""
         if not self.client:
             return {"error": "OpenAI API key not configured"}
-        
+
         # 使用数学工具验证答案
         math_verification = self.math_tools.verify_answer(student_answer, correct_answer)
-        
+
         prompt = f"""题目：{question_content}
 
 学生答案：{student_answer}
@@ -800,7 +805,7 @@ class LLMService:
 2. 错误的原因（概念理解错误？计算错误？方法错误？）
 3. 正确的思路应该是什么
 4. 给出改进建议"""
-        
+
         start_time = time.time()
         try:
             response = self.client.chat.completions.create(
@@ -812,11 +817,11 @@ class LLMService:
                 temperature=0.5,  # 诊断需要更准确
                 max_tokens=400,
             )
-            
+
             diagnosis = response.choices[0].message.content
-            
+
             duration_ms = (time.time() - start_time) * 1000
-            
+
             self._safe_log_llm_call(
                 user_id=user_id,
                 session_id=session_id,
@@ -826,7 +831,7 @@ class LLMService:
                 duration_ms=duration_ms,
                 analytics=analytics,
             )
-            
+
             return {
                 "diagnosis": diagnosis,
                 "error_type": self._extract_error_type(diagnosis),
@@ -835,18 +840,18 @@ class LLMService:
             }
         except Exception as e:
             return {"error": safe_llm_error(e)}
-    
+
     def session_summary(
         self,
-        session_stats: Dict[str, Any],
-        user_id: Optional[str] = None,
-        session_id: Optional[int] = None,
-        analytics: Optional[AnalyticsService] = None,
-    ) -> Dict[str, Any]:
+        session_stats: dict[str, Any],
+        user_id: str | None = None,
+        session_id: int | None = None,
+        analytics: AnalyticsService | None = None,
+    ) -> dict[str, Any]:
         """生成 Session 总结"""
         if not self.client:
             return {"error": "OpenAI API key not configured"}
-        
+
         prompt = f"""本次训练 Session 统计：
 - 总题数：{session_stats.get('total_questions', 0)}
 - 正确数：{session_stats.get('correct_count', 0)}
@@ -858,7 +863,7 @@ class LLMService:
 2. 指出进步的地方
 3. 给出下一步学习建议
 4. 保持积极正面的语调"""
-        
+
         start_time = time.time()
         try:
             response = self.client.chat.completions.create(
@@ -870,11 +875,11 @@ class LLMService:
                 temperature=0.8,
                 max_tokens=300,
             )
-            
+
             summary = response.choices[0].message.content
-            
+
             duration_ms = (time.time() - start_time) * 1000
-            
+
             self._safe_log_llm_call(
                 user_id=user_id,
                 session_id=session_id,
@@ -884,18 +889,16 @@ class LLMService:
                 duration_ms=duration_ms,
                 analytics=analytics,
             )
-            
+
             return {
                 "summary": summary,
                 "agent_type": "pomodoro_coach",
             }
         except Exception as e:
             return {"error": safe_llm_error(e)}
-    
+
     def _extract_error_type(self, diagnosis: str) -> str:
         """从诊断文本中提取错误类型"""
-        diagnosis_lower = diagnosis.lower()
-        
         if "概念" in diagnosis or "理解" in diagnosis:
             return "concept_error"
         elif "计算" in diagnosis or "运算" in diagnosis:
@@ -904,4 +907,3 @@ class LLMService:
             return "method_error"
         else:
             return "unknown"
-

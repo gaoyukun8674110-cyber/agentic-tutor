@@ -1,4 +1,5 @@
 """Safe LLM provider registry data."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -85,24 +86,25 @@ def provider_registry() -> dict[str, ProviderDefinition]:
         "gemini": ProviderDefinition(
             id="gemini",
             name="Google Gemini",
-            adapter="native",
-            base_url=None,
+            adapter="openai-compatible",
+            base_url=settings.GEMINI_BASE_URL,
             default_model=settings.GEMINI_MODEL,
-            models=[settings.GEMINI_MODEL],
+            models=[settings.GEMINI_MODEL, "gemini-2.5-pro", "gemini-2.5-flash", "gemini-1.5-pro"],
             requires_api_key=True,
-            implemented=False,
+            implemented=True,
         ),
     }
 
 
 def global_provider_credentials(provider_id: str) -> dict[str, Any]:
     """Return backend global fallback credentials for one provider."""
-    return {
+    credentials: dict[str, dict[str, Any]] = {
         "openai": {"api_key": settings.OPENAI_API_KEY, "base_url": settings.OPENAI_BASE_URL},
         "deepseek": {"api_key": settings.DEEPSEEK_API_KEY, "base_url": settings.DEEPSEEK_BASE_URL},
         "qwen": {"api_key": settings.QWEN_API_KEY, "base_url": settings.QWEN_BASE_URL},
         "linkapi": {"api_key": settings.LINKAPI_API_KEY, "base_url": settings.LINKAPI_BASE_URL},
         "ollama": {"api_key": "ollama", "base_url": settings.OLLAMA_BASE_URL},
         "anthropic": {"api_key": settings.ANTHROPIC_API_KEY, "base_url": None},
-        "gemini": {"api_key": settings.GEMINI_API_KEY, "base_url": None},
-    }.get(provider_id, {"api_key": None, "base_url": None})
+        "gemini": {"api_key": settings.GEMINI_API_KEY, "base_url": settings.GEMINI_BASE_URL},
+    }
+    return credentials.get(provider_id, {"api_key": None, "base_url": None})

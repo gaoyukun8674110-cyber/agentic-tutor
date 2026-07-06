@@ -1,11 +1,12 @@
 """CRUD, encryption, and safe metadata for user LLM credentials."""
+
 from __future__ import annotations
 
 import hashlib
 import hmac
 import ipaddress
 import socket
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from urllib.parse import urlparse
 
 from cryptography.fernet import Fernet, InvalidToken, MultiFernet
@@ -35,7 +36,7 @@ class InvalidProviderBaseURL(Exception):
 
 
 def utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _aad_prefix(user_id: int, provider_id: str) -> str:
@@ -176,9 +177,7 @@ class LLMCredentialService:
 
         cleaned_key = api_key.strip() if api_key else None
         credential.encrypted_api_key = (
-            self.encrypt_api_key(cleaned_key, user_id=user.id, provider_id=provider_id)
-            if cleaned_key
-            else None
+            self.encrypt_api_key(cleaned_key, user_id=user.id, provider_id=provider_id) if cleaned_key else None
         )
         credential.api_key_fingerprint = self.fingerprint_api_key(cleaned_key) if cleaned_key else None
         credential.base_url = base_url.strip() if base_url else None

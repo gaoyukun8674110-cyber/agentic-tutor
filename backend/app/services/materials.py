@@ -1,9 +1,9 @@
 """Study material ingestion, text extraction, chunking, and retrieval."""
+
 from __future__ import annotations
 
 import hashlib
 import html.parser
-import json
 import math
 import re
 import zipfile
@@ -13,26 +13,20 @@ from typing import Any, Protocol
 from xml.etree import ElementTree
 
 from openai import OpenAI
-from sqlalchemy import func
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models.materials import StudyMaterial, StudyMaterialChunk
-from app.services.vector_index import (
-    PersistentVectorIndex,
-    VectorIndexItem,
-    build_snapshot,
-    search_snapshot,
-)
-
 
 SUPPORTED_EXTENSIONS = {".txt", ".md", ".docx", ".pdf", ".epub"}
 WORD_RE = re.compile(r"[\w\u4e00-\u9fff]+", re.UNICODE)
 
 
 class EmbeddingProvider(Protocol):
-    def embed(self, text: str) -> list[float]:
-        ...
+    def embed(self, text: str) -> list[float]: ...
+
+    def embed_batch(self, texts: list[str]) -> list[list[float]]: ...
 
 
 class _HtmlTextExtractor(html.parser.HTMLParser):
@@ -73,11 +67,7 @@ def _extract_docx_text(content: bytes) -> str:
     with zipfile.ZipFile(PathLikeBytes(content)) as archive:
         document_xml = archive.read("word/document.xml")
     root = ElementTree.fromstring(document_xml)
-    texts = [
-        node.text
-        for node in root.iter()
-        if node.tag.endswith("}t") and node.text and node.text.strip()
-    ]
+    texts = [node.text for node in root.iter() if node.tag.endswith("}t") and node.text and node.text.strip()]
     extracted = normalize_text("\n".join(texts))
     if not extracted:
         raise ValueError("No readable text found in DOCX file")
@@ -152,7 +142,11 @@ def chunk_text(text: str, chunk_size: int = 1200, overlap: int = 150) -> list[di
     while start < len(normalized):
         end = min(start + chunk_size, len(normalized))
         if end < len(normalized):
-            boundary = max(normalized.rfind("\n", start, end), normalized.rfind("。", start, end), normalized.rfind(".", start, end))
+            boundary = max(
+                normalized.rfind("\n", start, end),
+                normalized.rfind("。", start, end),
+                normalized.rfind(".", start, end),
+            )
             if boundary > start + chunk_size // 2:
                 end = boundary + 1
         content = normalized[start:end].strip()
@@ -174,8 +168,9 @@ def chunk_text(text: str, chunk_size: int = 1200, overlap: int = 150) -> list[di
 class HashEmbeddingProvider:
     """Deterministic local embedding fallback for tests and no-key development."""
 
-    def __init__(self, dimensions: int = 128):
-        self.dimensions = max(8, dimensions)
+    def __init__(self, dimensions: int | None = None):
+        configured_dimensions = dimensions or settings.RAG_HASH_EMBEDDING_DIMENSIONS or settings.RAG_VECTOR_DIM
+        self.dimensions = max(8, configured_dimensions)
         self.mode = "hash"
 
     def embed(self, text: str) -> list[float]:
@@ -187,6 +182,9 @@ class HashEmbeddingProvider:
             vector[index] += 1.0
         return normalize_vector(vector)
 
+    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        return [self.embed(text) for text in texts]
+
 
 class OpenAIEmbeddingProvider:
     def __init__(self, api_key: str, base_url: str, model: str):
@@ -195,18 +193,26 @@ class OpenAIEmbeddingProvider:
         self.mode = "openai"
 
     def embed(self, text: str) -> list[float]:
-        response = self.client.embeddings.create(model=self.model, input=text)
+        response = self.client.embeddings.create(model=self.model, input=text, timeout=60)
         return [float(value) for value in response.data[0].embedding]
+
+    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        if not texts:
+            return []
+        response = self.client.embeddings.create(model=self.model, input=texts, timeout=60)
+        return [[float(value) for value in item.embedding] for item in response.data]
 
 
 def default_embedding_provider() -> EmbeddingProvider:
-    if settings.OPENAI_API_KEY:
-        return OpenAIEmbeddingProvider(
-            api_key=settings.OPENAI_API_KEY,
-            base_url=settings.OPENAI_BASE_URL,
-            model=settings.RAG_EMBEDDING_MODEL,
-        )
-    return HashEmbeddingProvider(dimensions=settings.RAG_HASH_EMBEDDING_DIMENSIONS)
+    if settings.RAG_EMBEDDING_MODE == "hash":
+        return HashEmbeddingProvider()
+    if not settings.RAG_EMBEDDING_API_KEY:
+        raise RuntimeError("RAG_EMBEDDING_API_KEY must be set for material embeddings")
+    return OpenAIEmbeddingProvider(
+        api_key=settings.RAG_EMBEDDING_API_KEY,
+        base_url=settings.RAG_EMBEDDING_BASE_URL,
+        model=settings.RAG_EMBEDDING_MODEL,
+    )
 
 
 def normalize_vector(vector: list[float]) -> list[float]:
@@ -219,7 +225,7 @@ def normalize_vector(vector: list[float]) -> list[float]:
 def cosine_similarity(left: list[float], right: list[float]) -> float:
     if not left or not right or len(left) != len(right):
         return 0.0
-    return sum(a * b for a, b in zip(left, right))
+    return sum(a * b for a, b in zip(left, right, strict=False))
 
 
 class MaterialService:
@@ -236,11 +242,27 @@ class MaterialService:
         self.upload_dir = upload_dir or Path(settings.RAG_UPLOAD_DIR)
         self.chunk_size = chunk_size or settings.RAG_CHUNK_SIZE
         self.chunk_overlap = chunk_overlap if chunk_overlap is not None else settings.RAG_CHUNK_OVERLAP
-        self.vector_index = PersistentVectorIndex(self.upload_dir / ".vector-index.json")
 
     @property
     def embedding_mode(self) -> str:
         return str(getattr(self.embedding_provider, "mode", "hash"))
+
+    def _embed_texts(self, texts: list[str]) -> list[list[float]]:
+        embed_batch = getattr(self.embedding_provider, "embed_batch", None)
+        if callable(embed_batch):
+            embeddings = embed_batch(texts)
+        else:
+            embeddings = [self.embedding_provider.embed(text) for text in texts]
+        self._validate_embedding_dimensions(embeddings)
+        return embeddings
+
+    def _validate_embedding_dimensions(self, embeddings: list[list[float]]) -> None:
+        for index, embedding in enumerate(embeddings):
+            if len(embedding) != settings.RAG_VECTOR_DIM:
+                raise ValueError(
+                    f"Embedding dimension mismatch at index {index}: "
+                    f"expected {settings.RAG_VECTOR_DIM}, got {len(embedding)}"
+                )
 
     def create_material_from_bytes(
         self,
@@ -277,21 +299,21 @@ class MaterialService:
         self.db.add(material)
         self.db.flush()
 
-        for chunk in chunks:
+        embeddings = self._embed_texts([chunk["content"] for chunk in chunks])
+        for chunk, embedding in zip(chunks, embeddings, strict=True):
             self.db.add(
                 StudyMaterialChunk(
                     material_id=material.id,
                     chunk_index=chunk["chunk_index"],
                     content=chunk["content"],
                     source_label=f"{material.filename} · chunk {chunk['chunk_index'] + 1}",
-                    embedding_json=json.dumps(self.embedding_provider.embed(chunk["content"])),
+                    embedding=embedding,
                     created_at=now,
                 )
             )
 
         self.db.commit()
         self.db.refresh(material)
-        self._rebuild_vector_index()
         return self._material_payload(material)
 
     def create_pending_material_from_bytes(
@@ -342,14 +364,15 @@ class MaterialService:
             chunks = chunk_text(extracted_text, chunk_size=self.chunk_size, overlap=self.chunk_overlap)
             now = datetime.now().isoformat()
             self.db.query(StudyMaterialChunk).filter(StudyMaterialChunk.material_id == material.id).delete()
-            for chunk in chunks:
+            embeddings = self._embed_texts([chunk["content"] for chunk in chunks])
+            for chunk, embedding in zip(chunks, embeddings, strict=True):
                 self.db.add(
                     StudyMaterialChunk(
                         material_id=material.id,
                         chunk_index=chunk["chunk_index"],
                         content=chunk["content"],
                         source_label=f"{material.filename} chunk {chunk['chunk_index'] + 1}",
-                        embedding_json=json.dumps(self.embedding_provider.embed(chunk["content"])),
+                        embedding=embedding,
                         created_at=now,
                     )
                 )
@@ -360,7 +383,6 @@ class MaterialService:
             material.updated_at = now
             self.db.commit()
             self.db.refresh(material)
-            self._rebuild_vector_index()
             return self._material_payload(material)
         except Exception as error:
             material.status = "failed"
@@ -389,104 +411,41 @@ class MaterialService:
         if not cleaned_query:
             return []
         top_k = max(1, min(top_k or settings.RAG_TOP_K, 10))
-        query_vector = self.embedding_provider.embed(cleaned_query)
-        snapshot = self._load_or_rebuild_vector_index()
-        chunk_scores = search_snapshot(
-            snapshot,
-            query_vector=query_vector,
-            top_k=top_k,
-            user_id=user_id,
-            material_ids=set(material_ids) if material_ids else None,
-            allowed_user_ids=None,
-        )
-        if not chunk_scores:
-            return []
-
-        score_by_chunk_id = {
-            chunk_id: round(max(0.0, 1 - ((distance * distance) / 2)), 6)
-            for chunk_id, distance in chunk_scores
-        }
-        ordered_chunk_ids = [chunk_id for chunk_id, _distance in chunk_scores]
-        chunks = (
+        query_vector = self._embed_texts([cleaned_query])[0]
+        self._configure_vector_search()
+        distance = StudyMaterialChunk.embedding.cosine_distance(query_vector)
+        rows = (
             self.db.query(StudyMaterialChunk)
+            .add_columns((1 - distance).label("score"))
             .join(StudyMaterial)
-            .filter(StudyMaterial.status == "ready", StudyMaterialChunk.id.in_(ordered_chunk_ids))
-            .all()
+            .filter(StudyMaterial.status == "ready")
         )
-        chunk_by_id = {chunk.id: chunk for chunk in chunks}
+        if user_id:
+            rows = rows.filter(self._user_scope_filter(user_id))
+        if material_ids:
+            rows = rows.filter(StudyMaterialChunk.material_id.in_(material_ids))
+        rows = rows.order_by(distance).limit(top_k).all()
+
         return [
             {
-                "chunk_id": chunk_by_id[chunk_id].id,
-                "material_id": chunk_by_id[chunk_id].material_id,
-                "filename": chunk_by_id[chunk_id].material.filename,
-                "source_label": chunk_by_id[chunk_id].source_label,
-                "content": chunk_by_id[chunk_id].content,
-                "score": score_by_chunk_id[chunk_id],
+                "chunk_id": chunk.id,
+                "material_id": chunk.material_id,
+                "filename": chunk.material.filename,
+                "source_label": chunk.source_label,
+                "content": chunk.content,
+                "score": round(max(0.0, float(score or 0.0)), 6),
                 "embedding_mode": self.embedding_mode,
             }
-            for chunk_id in ordered_chunk_ids
-            if chunk_id in chunk_by_id
+            for chunk, score in rows
         ]
 
     def _user_scope_filter(self, user_id: str):
         return StudyMaterial.user_id == user_id
 
-    def _ready_chunk_stats(self) -> tuple[int, int]:
-        ready_chunk_count, max_chunk_id = (
-            self.db.query(
-                func.count(StudyMaterialChunk.id),
-                func.max(StudyMaterialChunk.id),
-            )
-            .join(StudyMaterial)
-            .filter(StudyMaterial.status == "ready")
-            .one()
-        )
-        return int(ready_chunk_count or 0), int(max_chunk_id or 0)
-
-    def _indexable_chunks(self) -> list[VectorIndexItem]:
-        chunks = (
-            self.db.query(StudyMaterialChunk, StudyMaterial.user_id)
-            .join(StudyMaterial)
-            .filter(StudyMaterial.status == "ready")
-            .all()
-        )
-        items: list[VectorIndexItem] = []
-        for chunk, user_id in chunks:
-            vector = json.loads(chunk.embedding_json)
-            if not isinstance(vector, list) or len(vector) == 0:
-                continue
-            items.append(
-                VectorIndexItem(
-                    chunk_id=int(chunk.id),
-                    material_id=int(chunk.material_id),
-                    user_id=user_id,
-                    vector=[float(value) for value in vector],
-                )
-            )
-        return items
-
-    def _rebuild_vector_index(self) -> dict:
-        items = self._indexable_chunks()
-        ready_chunk_count, max_chunk_id = self._ready_chunk_stats()
-        snapshot = build_snapshot(
-            items,
-            embedding_mode=self.embedding_mode,
-            ready_chunk_count=ready_chunk_count,
-            max_chunk_id=max_chunk_id,
-        )
-        self.vector_index.save(snapshot)
-        return snapshot
-
-    def _load_or_rebuild_vector_index(self) -> dict:
-        ready_chunk_count, max_chunk_id = self._ready_chunk_stats()
-        snapshot = self.vector_index.load()
-        if (
-            snapshot is None
-            or int(snapshot.get("ready_chunk_count") or 0) != ready_chunk_count
-            or int(snapshot.get("max_chunk_id") or 0) != max_chunk_id
-        ):
-            return self._rebuild_vector_index()
-        return snapshot
+    def _configure_vector_search(self) -> None:
+        if self.db.bind and self.db.bind.dialect.name == "postgresql":
+            ef_search = max(1, int(settings.RAG_HNSW_EF_SEARCH))
+            self.db.execute(text(f"SET LOCAL hnsw.ef_search = {ef_search}"))
 
     def _material_payload(self, material: StudyMaterial) -> dict[str, Any]:
         return {

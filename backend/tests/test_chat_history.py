@@ -4,7 +4,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.database import Base
-from app.models.chat_history import TutorConversation, TutorConversationMessage
 from app.services.chat_history import ChatHistoryService
 
 

@@ -67,8 +67,9 @@ export function useTutorHistory({
     try {
       await deleteTutorConversation(id);
       queryClient.removeQueries({ queryKey: tutorQueryKeys.conversation(id) });
-      queryClient.setQueriesData<TutorConversationSummary[]>({ queryKey: ['tutor', 'conversations'] }, (items) =>
-        items?.filter((item) => item.id !== id) ?? [],
+      queryClient.setQueriesData<TutorConversationSummary[]>(
+        { queryKey: ['tutor', 'conversations'] },
+        (items) => items?.filter((item) => item.id !== id) ?? [],
       );
 
       if (activeConversationId === id) {

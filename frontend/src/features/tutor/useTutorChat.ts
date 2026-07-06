@@ -98,7 +98,8 @@ function tutorChatReducer(state: TutorChatState, action: TutorChatAction): Tutor
       return {
         ...state,
         activeConversationId: action.conversation.id,
-        currentExchangeCount: action.conversation.exchange_count ?? Math.floor(action.conversation.message_count / 2),
+        currentExchangeCount:
+          action.conversation.exchange_count ?? Math.floor(action.conversation.message_count / 2),
         currentSummary: action.conversation.summary || null,
         carryOverSummary: null,
         carryOverMessages: [],
@@ -146,7 +147,12 @@ function createMessageId() {
 }
 
 function normalizeLearningPhase(phase?: string | null): LearningPhase {
-  if (phase === 'planning' || phase === 'understanding' || phase === 'feynman' || phase === 'general') {
+  if (
+    phase === 'planning' ||
+    phase === 'understanding' ||
+    phase === 'feynman' ||
+    phase === 'general'
+  ) {
     return phase;
   }
   return 'general';
@@ -157,19 +163,25 @@ function toChatMessages(
   credentialSource?: 'user' | 'global' | 'local',
   credentialFingerprint?: string | null,
 ): ChatMessage[] {
-  const visibleMessages = messages.filter((message) => message.role === 'user' || message.role === 'assistant');
+  const visibleMessages = messages.filter(
+    (message) => message.role === 'user' || message.role === 'assistant',
+  );
   const lastAssistantIndex = visibleMessages.reduce(
     (lastIndex, message, index) => (message.role === 'assistant' ? index : lastIndex),
     -1,
   );
   return visibleMessages.map((message, index) => ({
-      id: String(message.id ?? createMessageId()),
-      role: message.role as ChatRole,
-      content: message.content,
-      label: message.label || undefined,
-      credentialSource: message.role === 'assistant' && index === lastAssistantIndex ? credentialSource : undefined,
-      credentialFingerprint: message.role === 'assistant' && index === lastAssistantIndex ? credentialFingerprint : undefined,
-    }));
+    id: String(message.id ?? createMessageId()),
+    role: message.role as ChatRole,
+    content: message.content,
+    label: message.label || undefined,
+    credentialSource:
+      message.role === 'assistant' && index === lastAssistantIndex ? credentialSource : undefined,
+    credentialFingerprint:
+      message.role === 'assistant' && index === lastAssistantIndex
+        ? credentialFingerprint
+        : undefined,
+  }));
 }
 
 export function useTutorChat({
@@ -192,7 +204,10 @@ export function useTutorChat({
   });
 
   const profiles = useMemo(
-    () => (profilesQuery.data && profilesQuery.data.length > 0 ? profilesQuery.data : FALLBACK_PROMPT_PROFILES),
+    () =>
+      profilesQuery.data && profilesQuery.data.length > 0
+        ? profilesQuery.data
+        : FALLBACK_PROMPT_PROFILES,
     [profilesQuery.data],
   );
   const currentProfile = useMemo(
@@ -204,7 +219,10 @@ export function useTutorChat({
     state.messages.filter((message) => message.role === 'user').length,
   );
   const loadError = useMemo(
-    () => (profilesQuery.error ? t('学习策略暂时使用本地默认配置', 'Using local default learning strategies') : null),
+    () =>
+      profilesQuery.error
+        ? t('学习策略暂时使用本地默认配置', 'Using local default learning strategies')
+        : null,
     [profilesQuery.error, t],
   );
   const modeLabel = useMemo(() => {
@@ -221,6 +239,7 @@ export function useTutorChat({
   }, [profiles, state.selectedProfile]);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       activeAbortControllerRef.current?.abort();
@@ -237,7 +256,11 @@ export function useTutorChat({
     const carryOverSummary = shouldCarryContext ? state.currentSummary : null;
     const carryOverMessages = shouldCarryContext
       ? state.messages
-          .filter((message) => message.role === 'user' || (message.role === 'assistant' && message.label !== 'Timer'))
+          .filter(
+            (message) =>
+              message.role === 'user' ||
+              (message.role === 'assistant' && message.label !== 'Timer'),
+          )
           .slice(-12)
       : [];
 
@@ -292,7 +315,11 @@ export function useTutorChat({
           dispatch({
             type: 'patch',
             updates: {
-              messages: toChatMessages(response.messages, response.credential_source, response.credential_fingerprint),
+              messages: toChatMessages(
+                response.messages,
+                response.credential_source,
+                response.credential_fingerprint,
+              ),
             },
           });
         } else {
@@ -334,14 +361,20 @@ export function useTutorChat({
         });
 
         if (response.conversation) {
-          queryClient.setQueriesData<TutorConversationSummary[]>({ queryKey: ['tutor', 'conversations'] }, (items) => {
-            const conversations = items ?? [];
-            return [
-              response.conversation as TutorConversationSummary,
-              ...conversations.filter((item) => item.id !== response.conversation?.id),
-            ];
-          });
-          queryClient.setQueryData(tutorQueryKeys.conversation(response.conversation.id), response.conversation);
+          queryClient.setQueriesData<TutorConversationSummary[]>(
+            { queryKey: ['tutor', 'conversations'] },
+            (items) => {
+              const conversations = items ?? [];
+              return [
+                response.conversation as TutorConversationSummary,
+                ...conversations.filter((item) => item.id !== response.conversation?.id),
+              ];
+            },
+          );
+          queryClient.setQueryData(
+            tutorQueryKeys.conversation(response.conversation.id),
+            response.conversation,
+          );
         }
 
         void queryClient.invalidateQueries({ queryKey: ['tutor', 'conversations'] });
@@ -416,7 +449,6 @@ export function useTutorChat({
           messages: nextMessages,
           input: '',
           selectedProfile: resolvedProfile.id,
-          isSending: true,
           errorBanner: null,
           errorCode: null,
           activeMaterialContext: null,

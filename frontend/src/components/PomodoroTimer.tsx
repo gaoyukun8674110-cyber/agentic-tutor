@@ -46,14 +46,18 @@ export function PomodoroTimer({
   persistedFocusMinutes,
 }: PomodoroTimerProps) {
   const [showSettings, setShowSettings] = useState(false);
-  const { state, logVersion, toggleTimer, resetTimer, switchMode, adjustDuration } = usePomodoroController();
+  const { state, logVersion, toggleTimer, resetTimer, switchMode, adjustDuration } =
+    usePomodoroController();
   const { language, tokens, t } = useSettings();
   const settingsPanelRef = useRef<HTMLDivElement | null>(null);
   const settingsToggleRef = useRef<HTMLButtonElement | null>(null);
   const lastSeenLogVersionRef = useRef(logVersion);
 
   useEffect(() => {
-    onStatsChange?.({ completedPomodoros: state.completedPomodoros, focusMinutes: state.focusMinutes });
+    onStatsChange?.({
+      completedPomodoros: state.completedPomodoros,
+      focusMinutes: state.focusMinutes,
+    });
   }, [onStatsChange, state.completedPomodoros, state.focusMinutes]);
 
   useEffect(() => {
@@ -90,18 +94,31 @@ export function PomodoroTimer({
   };
 
   const currentDuration = getCurrentDuration();
-  const progress = currentDuration > 0 ? ((currentDuration - state.remainingSeconds) / currentDuration) * 100 : 0;
+  const progress =
+    currentDuration > 0 ? ((currentDuration - state.remainingSeconds) / currentDuration) * 100 : 0;
   const currentConfig = modeCopy[state.mode];
   const Icon = currentConfig.icon;
   const modeColor =
-    state.mode === 'work' ? tokens.accentSecondary : state.mode === 'shortBreak' ? tokens.success : tokens.accentPrimary;
-  const displayedCompletedPomodoros = Math.max(persistedCompletedPomodoros ?? 0, state.completedPomodoros);
+    state.mode === 'work'
+      ? tokens.accentSecondary
+      : state.mode === 'shortBreak'
+        ? tokens.success
+        : tokens.accentPrimary;
+  const displayedCompletedPomodoros = Math.max(
+    persistedCompletedPomodoros ?? 0,
+    state.completedPomodoros,
+  );
   const displayedFocusMinutes = Math.max(persistedFocusMinutes ?? 0, state.focusMinutes);
 
   const cardStyle = cardSurfaceStyle(tokens);
 
   const headerStyle = {
-    background: state.mode === 'work' ? tokens.accentSecondarySoft : state.mode === 'shortBreak' ? tokens.successSoft : tokens.accentPrimarySoft,
+    background:
+      state.mode === 'work'
+        ? tokens.accentSecondarySoft
+        : state.mode === 'shortBreak'
+          ? tokens.successSoft
+          : tokens.accentPrimarySoft,
     backdropFilter: 'blur(14px)',
     borderBottom: tokens.borderSoft,
   };
@@ -109,7 +126,10 @@ export function PomodoroTimer({
   const controlStyle = panelSurfaceStyle(tokens);
 
   return (
-    <div className="h-full overflow-hidden rounded-2xl shadow-sm transition-all duration-300" style={cardStyle}>
+    <div
+      className="h-full overflow-hidden rounded-2xl shadow-sm transition-all duration-300"
+      style={cardStyle}
+    >
       <div className="border-b p-6" style={headerStyle}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -121,7 +141,10 @@ export function PomodoroTimer({
             </h2>
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium" style={controlStyle}>
+            <div
+              className="flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium"
+              style={controlStyle}
+            >
               <span style={{ color: tokens.textSecondary }}>{t('轮次', 'Rounds')}</span>
               <span style={{ color: tokens.textPrimary }}>{displayedCompletedPomodoros}</span>
             </div>
@@ -140,7 +163,11 @@ export function PomodoroTimer({
 
       <div className="p-6">
         {showSettings && (
-          <div ref={settingsPanelRef} className="mb-6 space-y-3 rounded-2xl p-4" style={controlStyle}>
+          <div
+            ref={settingsPanelRef}
+            className="mb-6 space-y-3 rounded-2xl p-4"
+            style={controlStyle}
+          >
             <h3 className="mb-3 text-sm font-medium" style={{ color: tokens.textPrimary }}>
               {t('时长设置', 'Durations')}
             </h3>
@@ -255,7 +282,10 @@ export function PomodoroTimer({
             </svg>
 
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <div className="text-4xl font-bold tabular-nums" style={{ color: tokens.textPrimary }}>
+              <div
+                className="text-4xl font-bold tabular-nums"
+                style={{ color: tokens.textPrimary }}
+              >
                 {formatTime(state.remainingSeconds)}
               </div>
               <div className="mt-1 text-sm" style={{ color: tokens.textSecondary }}>
@@ -287,7 +317,11 @@ export function PomodoroTimer({
               </>
             )}
           </button>
-          <button onClick={resetTimer} className="rounded-xl px-4 py-3 transition-all" style={controlStyle}>
+          <button
+            onClick={resetTimer}
+            className="rounded-xl px-4 py-3 transition-all"
+            style={controlStyle}
+          >
             <RotateCcw className="h-5 w-5" style={{ color: tokens.textSecondary }} />
           </button>
         </div>
@@ -296,11 +330,19 @@ export function PomodoroTimer({
           className="mt-4 rounded-2xl p-3"
           style={{
             ...controlStyle,
-            background: state.mode === 'work' ? tokens.accentSecondarySoft : state.mode === 'shortBreak' ? tokens.successSoft : tokens.accentPrimarySoft,
+            background:
+              state.mode === 'work'
+                ? tokens.accentSecondarySoft
+                : state.mode === 'shortBreak'
+                  ? tokens.successSoft
+                  : tokens.accentPrimarySoft,
           }}
         >
           <p className="text-center text-sm tabular-nums" style={{ color: tokens.textSecondary }}>
-            {t(`今日专注 ${displayedFocusMinutes} 分钟`, `${displayedFocusMinutes} focused minutes today`)}
+            {t(
+              `今日专注 ${displayedFocusMinutes} 分钟`,
+              `${displayedFocusMinutes} focused minutes today`,
+            )}
           </p>
         </div>
       </div>

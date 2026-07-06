@@ -28,15 +28,30 @@ const quickActions = [
 
 function getFocusToneStyle(tokens: ThemeTokens, tone: FocusTone) {
   return {
-    active: { background: tokens.successSoft, borderColor: tokens.success, color: tokens.success, dot: tokens.success },
-    paused: { background: tokens.warningSoft, borderColor: tokens.warning, color: tokens.warning, dot: tokens.warning },
+    active: {
+      background: tokens.successSoft,
+      borderColor: tokens.success,
+      color: tokens.success,
+      dot: tokens.success,
+    },
+    paused: {
+      background: tokens.warningSoft,
+      borderColor: tokens.warning,
+      color: tokens.warning,
+      dot: tokens.warning,
+    },
     ready: {
       background: tokens.surfaceMuted,
       borderColor: 'var(--ai-border-subtle)',
       color: tokens.textSecondary,
       dot: tokens.textSecondary,
     },
-    rest: { background: tokens.infoSoft, borderColor: tokens.info, color: tokens.info, dot: tokens.info },
+    rest: {
+      background: tokens.infoSoft,
+      borderColor: tokens.info,
+      color: tokens.info,
+      dot: tokens.info,
+    },
     thinking: {
       background: tokens.accentPrimarySoft,
       borderColor: tokens.accentPrimary,
@@ -46,7 +61,12 @@ function getFocusToneStyle(tokens: ThemeTokens, tone: FocusTone) {
   }[tone];
 }
 
-export function TutorChatWorkspace({ trainingMode, onExit, onConfigureModel, onPomodoroLogged }: TutorChatWorkspaceProps) {
+export function TutorChatWorkspace({
+  trainingMode,
+  onExit,
+  onConfigureModel,
+  onPomodoroLogged,
+}: TutorChatWorkspaceProps) {
   const { language, textStyle, tokens, t } = useSettings();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isPinnedToBottom, setIsPinnedToBottom] = useState(true);
@@ -56,12 +76,19 @@ export function TutorChatWorkspace({ trainingMode, onExit, onConfigureModel, onP
   const historySearchInputRef = useRef<HTMLInputElement>(null);
 
   const materials = useTutorMaterials();
-  const { remainingSeconds, timerState, isRunning, timerHasStarted, resetTimer, startNextRound, toggleTimer } =
-    useTutorTimer({
-      language,
-      onPomodoroLogged,
-      onTimerMessage: (content) => appendTimerMessageRef.current(content),
-    });
+  const {
+    remainingSeconds,
+    timerState,
+    isRunning,
+    timerHasStarted,
+    resetTimer,
+    startNextRound,
+    toggleTimer,
+  } = useTutorTimer({
+    language,
+    onPomodoroLogged,
+    onTimerMessage: (content) => appendTimerMessageRef.current(content),
+  });
   const chat = useTutorChat({
     language,
     t,
@@ -279,7 +306,10 @@ export function TutorChatWorkspace({ trainingMode, onExit, onConfigureModel, onP
                 </button>
               )}
             </div>
-            <div className="flex items-center gap-2 text-sm" style={{ color: tokens.textSecondary }}>
+            <div
+              className="flex items-center gap-2 text-sm"
+              style={{ color: tokens.textSecondary }}
+            >
               <span
                 className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium"
                 style={{
@@ -289,12 +319,19 @@ export function TutorChatWorkspace({ trainingMode, onExit, onConfigureModel, onP
                 }}
                 title={`${modeLabel} | ${detailText}`}
               >
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: focusToneStyle.dot }} />
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ background: focusToneStyle.dot }}
+                />
                 {focusText}
               </span>
               <span
                 className="rounded-full px-2 py-1 text-xs"
-                style={{ background: tokens.surfaceMuted, border: tokens.borderSubtle, color: tokens.textSecondary }}
+                style={{
+                  background: tokens.surfaceMuted,
+                  border: tokens.borderSubtle,
+                  color: tokens.textSecondary,
+                }}
               >
                 {language === 'zh' ? `当前阶段：${phaseText}` : `Phase: ${phaseText}`}
               </span>

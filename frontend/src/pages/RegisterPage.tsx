@@ -27,7 +27,12 @@ export function RegisterPage() {
     setError('');
     const cleanUsername = username.trim();
     if (!USERNAME_PATTERN.test(cleanUsername)) {
-      setError(t('用户名只能包含字母、数字、下划线或短横线，长度 3-64。', 'Username must be 3-64 letters, numbers, underscores, or hyphens.'));
+      setError(
+        t(
+          '用户名只能包含字母、数字、下划线或短横线，长度 3-64。',
+          'Username must be 3-64 letters, numbers, underscores, or hyphens.',
+        ),
+      );
       return;
     }
     if (password.length < 8 || password.length > 128) {
@@ -52,11 +57,21 @@ export function RegisterPage() {
   };
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center px-6 py-10" style={{ ...textStyle, color: tokens.textPrimary }}>
+    <main
+      className="relative flex min-h-screen items-center justify-center px-6 py-10"
+      style={{ ...textStyle, color: tokens.textPrimary }}
+    >
       <div className="fixed inset-0" style={{ background: tokens.pageGradient }} />
-      <form onSubmit={submit} className="relative w-full max-w-md rounded-2xl p-8 shadow-xl" style={cardSurfaceStyle(tokens)}>
+      <form
+        onSubmit={submit}
+        className="relative w-full max-w-md rounded-2xl p-8 shadow-xl"
+        style={cardSurfaceStyle(tokens)}
+      >
         <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl" style={{ background: tokens.surfaceAccent }}>
+          <div
+            className="flex h-11 w-11 items-center justify-center rounded-xl"
+            style={{ background: tokens.surfaceAccent }}
+          >
             <Brain className="h-6 w-6" />
           </div>
           <div>
@@ -67,14 +82,68 @@ export function RegisterPage() {
           </div>
         </div>
 
-        <input className="mb-3 w-full rounded-xl border px-4 py-3 outline-none" style={{ background: tokens.surface, borderColor: tokens.borderStrong, color: tokens.textPrimary }} placeholder={t('用户名', 'Username')} value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" required />
-        <input className="mb-3 w-full rounded-xl border px-4 py-3 outline-none" style={{ background: tokens.surface, borderColor: tokens.borderStrong, color: tokens.textPrimary }} placeholder={t('邮箱（可选）', 'Email (optional)')} value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" />
-        <input className="mb-3 w-full rounded-xl border px-4 py-3 outline-none" style={{ background: tokens.surface, borderColor: tokens.borderStrong, color: tokens.textPrimary }} placeholder={t('密码', 'Password')} type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" required />
-        <input className="mb-4 w-full rounded-xl border px-4 py-3 outline-none" style={{ background: tokens.surface, borderColor: tokens.borderStrong, color: tokens.textPrimary }} placeholder={t('重复密码', 'Confirm password')} type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} autoComplete="new-password" required />
+        <input
+          className="mb-3 w-full rounded-xl border px-4 py-3 outline-none"
+          style={{
+            background: tokens.surface,
+            borderColor: tokens.borderStrong,
+            color: tokens.textPrimary,
+          }}
+          placeholder={t('用户名', 'Username')}
+          value={username}
+          onChange={(event) => setUsername(event.target.value)}
+          autoComplete="username"
+          required
+        />
+        <input
+          className="mb-3 w-full rounded-xl border px-4 py-3 outline-none"
+          style={{
+            background: tokens.surface,
+            borderColor: tokens.borderStrong,
+            color: tokens.textPrimary,
+          }}
+          placeholder={t('邮箱（可选）', 'Email (optional)')}
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          autoComplete="email"
+        />
+        <input
+          className="mb-3 w-full rounded-xl border px-4 py-3 outline-none"
+          style={{
+            background: tokens.surface,
+            borderColor: tokens.borderStrong,
+            color: tokens.textPrimary,
+          }}
+          placeholder={t('密码', 'Password')}
+          type="password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          autoComplete="new-password"
+          required
+        />
+        <input
+          className="mb-4 w-full rounded-xl border px-4 py-3 outline-none"
+          style={{
+            background: tokens.surface,
+            borderColor: tokens.borderStrong,
+            color: tokens.textPrimary,
+          }}
+          placeholder={t('重复密码', 'Confirm password')}
+          type="password"
+          value={confirmPassword}
+          onChange={(event) => setConfirmPassword(event.target.value)}
+          autoComplete="new-password"
+          required
+        />
 
         {error ? <p className="mb-4 text-sm text-red-500">{error}</p> : null}
 
-        <Button type="submit" disabled={isSubmitting} className="w-full rounded-xl py-3 text-white" style={primaryActionStyle(tokens)}>
+        <Button
+          type="submit"
+          disabled={isSubmitting}
+          className="w-full rounded-xl py-3 text-white"
+          style={primaryActionStyle(tokens)}
+        >
           {isSubmitting ? t('注册中...', 'Creating...') : t('注册并登录', 'Create account')}
         </Button>
 

@@ -48,7 +48,9 @@ export interface DashboardSummary {
   calendar_events: DashboardCalendarEvent[];
 }
 
-export async function fetchDashboardSummary(options?: ApiRequestOptions): Promise<DashboardSummary> {
+export async function fetchDashboardSummary(
+  options?: ApiRequestOptions,
+): Promise<DashboardSummary> {
   return apiFetch<DashboardSummary>('/api/dashboard/summary', options);
 }
 
@@ -65,7 +67,12 @@ export async function createDashboardTask(
 
 export async function updateDashboardTask(
   taskId: number,
-  update: Partial<Pick<DashboardTask, 'subject' | 'task' | 'duration' | 'priority' | 'completed' | 'scheduled_date'>>,
+  update: Partial<
+    Pick<
+      DashboardTask,
+      'subject' | 'task' | 'duration' | 'priority' | 'completed' | 'scheduled_date'
+    >
+  >,
 ): Promise<DashboardTask> {
   return apiFetch<DashboardTask>(`/api/dashboard/tasks/${taskId}`, {
     method: 'PATCH',

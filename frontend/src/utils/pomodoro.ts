@@ -38,7 +38,9 @@ export const POMODORO_DURATIONS: Record<PomodoroMode, number> = {
   longBreak: 20,
 };
 
-export function getBreakModeForCompletedFocusRound(completedFocusRounds: number): 'shortBreak' | 'longBreak' {
+export function getBreakModeForCompletedFocusRound(
+  completedFocusRounds: number,
+): 'shortBreak' | 'longBreak' {
   return completedFocusRounds % 2 === 0 ? 'longBreak' : 'shortBreak';
 }
 
@@ -139,8 +141,11 @@ export function adjustPomodoroDuration(
   const adjustment = increment ? 1 : -1;
   const nextDuration = clampPomodoroDuration(
     mode,
-    (mode === 'work' ? state.workDuration : mode === 'shortBreak' ? state.shortBreakDuration : state.longBreakDuration) +
-      adjustment,
+    (mode === 'work'
+      ? state.workDuration
+      : mode === 'shortBreak'
+        ? state.shortBreakDuration
+        : state.longBreakDuration) + adjustment,
   );
 
   const nextState: PomodoroState = {
@@ -176,7 +181,8 @@ export function resolvePomodoroCompletion(state: PomodoroState): PomodoroComplet
       event: {
         kind: 'focus-complete',
         nextMode,
-        breakMinutes: nextMode === 'shortBreak' ? state.shortBreakDuration : state.longBreakDuration,
+        breakMinutes:
+          nextMode === 'shortBreak' ? state.shortBreakDuration : state.longBreakDuration,
         focusLogMinutes: state.workDuration,
       },
     };
@@ -205,7 +211,10 @@ export function normalizePomodoroState(value: unknown): PomodoroState {
   }
 
   const candidate = value as Partial<Record<keyof PomodoroState, unknown>>;
-  const workDuration = clampPomodoroDuration('work', Number(candidate.workDuration) || POMODORO_DURATIONS.work);
+  const workDuration = clampPomodoroDuration(
+    'work',
+    Number(candidate.workDuration) || POMODORO_DURATIONS.work,
+  );
   const shortBreakDuration = clampPomodoroDuration(
     'shortBreak',
     Number(candidate.shortBreakDuration) || POMODORO_DURATIONS.shortBreak,
@@ -259,7 +268,10 @@ export function normalizePomodoroState(value: unknown): PomodoroState {
   return baseState.isRunning ? reconcilePomodoroState(normalizedState).state : normalizedState;
 }
 
-export function reconcilePomodoroState(state: PomodoroState, now = Date.now()): PomodoroReconcileResult {
+export function reconcilePomodoroState(
+  state: PomodoroState,
+  now = Date.now(),
+): PomodoroReconcileResult {
   if (!state.isRunning) {
     return {
       state: state.targetEndAt === null ? state : { ...state, targetEndAt: null },

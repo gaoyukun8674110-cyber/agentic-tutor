@@ -4,11 +4,12 @@ Revision ID: 20260514_04
 Revises: 20260514_03
 Create Date: 2026-05-14
 """
+
 from __future__ import annotations
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 revision = "20260514_04"
 down_revision = "20260514_03"

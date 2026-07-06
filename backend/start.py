@@ -1,9 +1,9 @@
 """Start the local FastAPI development server."""
-from pathlib import Path
+
 import os
+from pathlib import Path
 
 import uvicorn
-
 
 if __name__ == "__main__":
     os.chdir(Path(__file__).resolve().parent)

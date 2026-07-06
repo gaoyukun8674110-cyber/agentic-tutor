@@ -26,7 +26,10 @@ export function TopNavbar() {
       <div className="mx-auto max-w-7xl px-6">
         <div className="flex h-16 items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl shadow-md" style={chipStyle}>
+            <div
+              className="flex h-9 w-9 items-center justify-center rounded-xl shadow-md"
+              style={chipStyle}
+            >
               <Brain className="h-5 w-5" />
             </div>
             <div>
@@ -60,7 +63,10 @@ export function TopNavbar() {
               {theme === 'light' ? t('夜间模式', 'Night mode') : t('日间模式', 'Day mode')}
             </button>
 
-            <div className="hidden items-center gap-3 rounded-full px-3 py-1.5 sm:flex" style={chipStyle}>
+            <div
+              className="hidden items-center gap-3 rounded-full px-3 py-1.5 sm:flex"
+              style={chipStyle}
+            >
               <div
                 className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold"
                 style={{ background: tokens.surface, color: tokens.textPrimary }}

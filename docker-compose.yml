@@ -1,0 +1,40 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: tutor
+      POSTGRES_PASSWORD: tutor
+      POSTGRES_DB: tutor
+    ports:
+      - "55432:5432"
+    volumes:
+      - pgvector-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tutor -d tutor"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://tutor:tutor@db:5432/tutor
+      RAG_UPLOAD_DIR: /data/storage/materials
+      RAG_VECTOR_DIM: 1536
+      RAG_HNSW_EF_SEARCH: 40
+      RAG_EMBEDDING_BASE_URL: https://api.openai.com/v1
+      RAG_EMBEDDING_MODEL: text-embedding-3-small
+      RAG_EMBEDDING_API_KEY: ${RAG_EMBEDDING_API_KEY:?set RAG_EMBEDDING_API_KEY in the shell before docker compose up}
+      ALLOW_GLOBAL_LLM_FALLBACK: "true"
+    ports:
+      - "8001:8001"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - backend-data:/data
+
+volumes:
+  pgvector-data:
+  backend-data:

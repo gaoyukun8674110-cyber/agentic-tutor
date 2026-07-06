@@ -14,16 +14,18 @@ describe('TutorComposer', () => {
         language="en"
         quickActions={[]}
         conversationNotice={null}
-        tokens={{
-          surfaceElevated: '#fff',
-          borderSubtle: '1px solid #ddd',
-          shadowSoft: 'none',
-          textPrimary: '#111',
-          textSecondary: '#666',
-          textInverted: '#fff',
-          disabledSurface: '#ccc',
-          disabledText: '#999',
-        } as never}
+        tokens={
+          {
+            surfaceElevated: '#fff',
+            borderSubtle: '1px solid #ddd',
+            shadowSoft: 'none',
+            textPrimary: '#111',
+            textSecondary: '#666',
+            textInverted: '#fff',
+            disabledSurface: '#ccc',
+            disabledText: '#999',
+          } as never
+        }
         t={(zh, en) => en ?? zh}
         onInputChange={() => undefined}
         onSend={onSend}

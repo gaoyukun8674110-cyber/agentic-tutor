@@ -4,16 +4,15 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
-from app.database import Base
+from app.config import settings
 from app.services.materials import (
     HashEmbeddingProvider,
     MaterialService,
     chunk_text,
     extract_text_from_file_bytes,
 )
+from tests.auth_helpers import create_test_user
+from tests.pgvector_helpers import make_pgvector_session_factory
 
 
 def build_docx_bytes(paragraphs):
@@ -57,8 +56,10 @@ def build_pdf_bytes(text):
     )
     stream = DecodedStreamObject()
     escaped_text = text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
-    stream.set_data(f"BT /F1 12 Tf 10 100 Td ({escaped_text}) Tj ET".encode("utf-8"))
-    page[NameObject("/Resources")] = DictionaryObject({NameObject("/Font"): DictionaryObject({NameObject("/F1"): font})})
+    stream.set_data(f"BT /F1 12 Tf 10 100 Td ({escaped_text}) Tj ET".encode())
+    page[NameObject("/Resources")] = DictionaryObject(
+        {NameObject("/Font"): DictionaryObject({NameObject("/F1"): font})}
+    )
     page[NameObject("/Contents")] = stream
     output = io.BytesIO()
     writer.write(output)
@@ -67,9 +68,10 @@ def build_pdf_bytes(text):
 
 class MaterialRagTests(unittest.TestCase):
     def setUp(self):
-        engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
-        Base.metadata.create_all(bind=engine)
-        self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        self.engine, self.SessionLocal = make_pgvector_session_factory()
+
+    def tearDown(self):
+        self.engine.dispose()
 
     def test_extract_text_supports_txt_markdown_docx_pdf_and_epub(self):
         self.assertIn(
@@ -121,11 +123,12 @@ class MaterialRagTests(unittest.TestCase):
             with tempfile.TemporaryDirectory() as tmpdir:
                 service = MaterialService(
                     db,
-                    embedding_provider=HashEmbeddingProvider(dimensions=32),
+                    embedding_provider=HashEmbeddingProvider(dimensions=settings.RAG_VECTOR_DIM),
                     upload_dir=Path(tmpdir),
                     chunk_size=120,
                     chunk_overlap=20,
                 )
+                create_test_user(db, username="learner-1")
                 material = service.create_material_from_bytes(
                     filename="probability-notes.txt",
                     content=b"Bayes theorem connects prior probability, likelihood, and posterior probability.",
@@ -149,17 +152,18 @@ class MaterialRagTests(unittest.TestCase):
         finally:
             db.close()
 
-    def test_material_search_uses_vector_index_instead_of_recent_chunk_window(self):
+    def test_material_search_uses_database_similarity_instead_of_recent_chunk_window(self):
         db = self.SessionLocal()
         try:
             with tempfile.TemporaryDirectory() as tmpdir:
                 service = MaterialService(
                     db,
-                    embedding_provider=HashEmbeddingProvider(dimensions=48),
+                    embedding_provider=HashEmbeddingProvider(dimensions=settings.RAG_VECTOR_DIM),
                     upload_dir=Path(tmpdir),
                     chunk_size=200,
                     chunk_overlap=20,
                 )
+                create_test_user(db, username="learner-1")
                 older_material = service.create_material_from_bytes(
                     filename="older-probability.txt",
                     content=b"Posterior probability updates a prior after observing evidence in Bayes theorem.",
@@ -197,17 +201,18 @@ class MaterialRagTests(unittest.TestCase):
         finally:
             db.close()
 
-    def test_material_search_honors_material_id_filters_with_vector_index(self):
+    def test_material_search_honors_material_id_filters_with_database_similarity(self):
         db = self.SessionLocal()
         try:
             with tempfile.TemporaryDirectory() as tmpdir:
                 service = MaterialService(
                     db,
-                    embedding_provider=HashEmbeddingProvider(dimensions=48),
+                    embedding_provider=HashEmbeddingProvider(dimensions=settings.RAG_VECTOR_DIM),
                     upload_dir=Path(tmpdir),
                     chunk_size=200,
                     chunk_overlap=20,
                 )
+                create_test_user(db, username="learner-1")
                 bayes_material = service.create_material_from_bytes(
                     filename="bayes.txt",
                     content=b"Posterior probability is central to Bayes theorem.",
@@ -246,11 +251,13 @@ class MaterialRagTests(unittest.TestCase):
             with tempfile.TemporaryDirectory() as tmpdir:
                 service = MaterialService(
                     db,
-                    embedding_provider=HashEmbeddingProvider(dimensions=48),
+                    embedding_provider=HashEmbeddingProvider(dimensions=settings.RAG_VECTOR_DIM),
                     upload_dir=Path(tmpdir),
                     chunk_size=200,
                     chunk_overlap=20,
                 )
+                create_test_user(db, username="alice")
+                create_test_user(db, username="bob")
                 alice_material = service.create_material_from_bytes(
                     filename="alice-statistics.txt",
                     content=b"Bayes theorem uses posterior probability and prior probability.",

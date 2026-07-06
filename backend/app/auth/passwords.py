@@ -1,8 +1,10 @@
 """Password hashing helpers."""
+
 from argon2 import PasswordHasher
 from argon2.exceptions import Argon2Error
 
 _password_hasher = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=2)
+
 
 def hash_password(password: str) -> str:
     """Hash a plaintext password with argon2id."""

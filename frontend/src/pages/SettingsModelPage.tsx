@@ -65,9 +65,12 @@ export function SettingsModelPage() {
     }
     return map;
   }, [credentialsQuery.data]);
-  const selectedProvider = providers.find((provider) => provider.id === selectedProviderId) ?? providers[0];
-  const selectedCredential = selectedProvider ? credentialsByProvider.get(selectedProvider.id) : undefined;
-  const form = selectedProvider ? forms[selectedProvider.id] ?? emptyForm : emptyForm;
+  const selectedProvider =
+    providers.find((provider) => provider.id === selectedProviderId) ?? providers[0];
+  const selectedCredential = selectedProvider
+    ? credentialsByProvider.get(selectedProvider.id)
+    : undefined;
+  const form = selectedProvider ? (forms[selectedProvider.id] ?? emptyForm) : emptyForm;
 
   const refreshCredentials = async () => {
     await Promise.all([
@@ -171,7 +174,10 @@ export function SettingsModelPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden" style={{ ...textStyle, color: tokens.textPrimary }}>
+    <div
+      className="relative min-h-screen overflow-hidden"
+      style={{ ...textStyle, color: tokens.textPrimary }}
+    >
       <div className="fixed inset-0" style={{ background: tokens.pageGradient }} />
       <div className="fixed inset-0" style={{ background: tokens.overlayGradient }} />
       <TopNavbar />
@@ -181,20 +187,29 @@ export function SettingsModelPage() {
           <div>
             <h1 className="text-3xl font-bold">{t('模型配置', 'Model settings')}</h1>
             <p className="mt-2 text-sm" style={{ color: tokens.textSecondary }}>
-              {t('保存个人 provider 凭证后，Tutor 会优先使用你的 Key。', 'Saved provider credentials are used before demo fallback keys.')}
+              {t(
+                '保存个人 provider 凭证后，Tutor 会优先使用你的 Key。',
+                'Saved provider credentials are used before demo fallback keys.',
+              )}
             </p>
           </div>
           <KeyRound className="h-9 w-9" style={{ color: tokens.accentPrimary }} />
         </div>
 
         {error && (
-          <div className="mb-4 flex items-start gap-2 rounded-2xl border px-4 py-3 text-sm" style={statusPanelStyle(tokens, 'warning')}>
+          <div
+            className="mb-4 flex items-start gap-2 rounded-2xl border px-4 py-3 text-sm"
+            style={statusPanelStyle(tokens, 'warning')}
+          >
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             {error}
           </div>
         )}
         {message && (
-          <div className="mb-4 flex items-start gap-2 rounded-2xl border px-4 py-3 text-sm" style={statusPanelStyle(tokens, 'success')}>
+          <div
+            className="mb-4 flex items-start gap-2 rounded-2xl border px-4 py-3 text-sm"
+            style={statusPanelStyle(tokens, 'success')}
+          >
             <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
             {message}
           </div>
@@ -222,7 +237,9 @@ export function SettingsModelPage() {
                         {sourceLabel(provider, credential)}
                       </p>
                     </div>
-                    {credential?.is_default && <Star className="h-4 w-4" style={{ color: tokens.warning }} />}
+                    {credential?.is_default && (
+                      <Star className="h-4 w-4" style={{ color: tokens.warning }} />
+                    )}
                   </div>
                 </button>
               );
@@ -236,13 +253,18 @@ export function SettingsModelPage() {
                   <div>
                     <h2 className="text-2xl font-semibold">{selectedProvider.name}</h2>
                     <p className="text-sm" style={{ color: tokens.textSecondary }}>
-                      {selectedProvider.adapter} · {sourceLabel(selectedProvider, selectedCredential)}
+                      {selectedProvider.adapter} ·{' '}
+                      {sourceLabel(selectedProvider, selectedCredential)}
                     </p>
                   </div>
                   <div className="flex gap-2">
                     <Button
                       onClick={() => patchMutation.mutate({ isDefault: true })}
-                      disabled={!selectedCredential || selectedCredential.is_default || patchMutation.isPending}
+                      disabled={
+                        !selectedCredential ||
+                        selectedCredential.is_default ||
+                        patchMutation.isPending
+                      }
                       className="rounded-xl"
                       style={cardSurfaceStyle(tokens)}
                     >
@@ -266,9 +288,17 @@ export function SettingsModelPage() {
                   <input
                     value={form.apiKey}
                     onChange={(event) => updateForm({ apiKey: event.target.value })}
-                    placeholder={selectedCredential ? t('留空则不显示旧 Key', 'Leave blank; saved keys are never shown') : 'sk-...'}
+                    placeholder={
+                      selectedCredential
+                        ? t('留空则不显示旧 Key', 'Leave blank; saved keys are never shown')
+                        : 'sk-...'
+                    }
                     className="w-full rounded-xl border px-3 py-2 outline-none"
-                    style={{ background: tokens.surface, borderColor: 'var(--ai-border-subtle)', color: tokens.textPrimary }}
+                    style={{
+                      background: tokens.surface,
+                      borderColor: 'var(--ai-border-subtle)',
+                      color: tokens.textPrimary,
+                    }}
                     type="password"
                     autoComplete="off"
                   />
@@ -279,21 +309,34 @@ export function SettingsModelPage() {
                   <input
                     value={form.baseUrl}
                     onChange={(event) => updateForm({ baseUrl: event.target.value })}
-                    placeholder={selectedCredential?.base_url || t('留空使用后端默认 Base URL', 'Leave blank to use backend default Base URL')}
+                    placeholder={
+                      selectedCredential?.base_url ||
+                      t('留空使用后端默认 Base URL', 'Leave blank to use backend default Base URL')
+                    }
                     className="w-full rounded-xl border px-3 py-2 outline-none"
-                    style={{ background: tokens.surface, borderColor: 'var(--ai-border-subtle)', color: tokens.textPrimary }}
+                    style={{
+                      background: tokens.surface,
+                      borderColor: 'var(--ai-border-subtle)',
+                      color: tokens.textPrimary,
+                    }}
                   />
                 </label>
 
                 <label className="block">
-                  <span className="mb-1 block text-sm font-medium">{t('默认模型', 'Default model')}</span>
+                  <span className="mb-1 block text-sm font-medium">
+                    {t('默认模型', 'Default model')}
+                  </span>
                   <input
                     value={form.defaultModel}
                     onChange={(event) => updateForm({ defaultModel: event.target.value })}
                     list="llm-models"
                     placeholder={selectedProvider.default_model}
                     className="w-full rounded-xl border px-3 py-2 outline-none"
-                    style={{ background: tokens.surface, borderColor: 'var(--ai-border-subtle)', color: tokens.textPrimary }}
+                    style={{
+                      background: tokens.surface,
+                      borderColor: 'var(--ai-border-subtle)',
+                      color: tokens.textPrimary,
+                    }}
                   />
                   <datalist id="llm-models">
                     {selectedProvider.models.map((model) => (
@@ -324,7 +367,10 @@ export function SettingsModelPage() {
                 <div className="flex flex-wrap gap-3">
                   <Button
                     onClick={() => saveMutation.mutate()}
-                    disabled={saveMutation.isPending || (selectedProvider.id !== 'ollama' && !form.apiKey.trim())}
+                    disabled={
+                      saveMutation.isPending ||
+                      (selectedProvider.id !== 'ollama' && !form.apiKey.trim())
+                    }
                     className="rounded-xl"
                     style={primaryActionStyle(tokens)}
                   >
