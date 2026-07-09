@@ -639,12 +639,82 @@ class LLMService:
         client: OpenAI,
         **kwargs,
     ) -> tuple[Any, dict[str, int | None]]:
-        """Call chat completions once and return the assistant message, preserving tool_calls."""
+        """Call chat completions in streaming mode and return the aggregated assistant message."""
         sanitized_kwargs = self._sanitize_chat_completion_kwargs(kwargs)
-        response = client.chat.completions.create(**sanitized_kwargs)
-        choices = getattr(response, "choices", None) or []
-        message = getattr(choices[0], "message", {"role": "assistant", "content": ""}) if choices else {}
-        return message, self._response_usage_payload(response)
+        stream_kwargs = {**sanitized_kwargs, "stream": True, "stream_options": {"include_usage": True}}
+        try:
+            stream = client.chat.completions.create(**stream_kwargs)
+        except Exception:
+            fallback_kwargs = {**sanitized_kwargs, "stream": True}
+            stream = client.chat.completions.create(**fallback_kwargs)
+
+        content_parts: list[str] = []
+        usage_payload: dict[str, int | None] = {}
+        tool_calls_by_index: dict[int, dict[str, Any]] = {}
+
+        for chunk in stream:
+            usage = getattr(chunk, "usage", None)
+            if usage:
+                usage_payload = {
+                    "prompt_tokens": getattr(usage, "prompt_tokens", None),
+                    "completion_tokens": getattr(usage, "completion_tokens", None),
+                    "total_tokens": getattr(usage, "total_tokens", None),
+                }
+
+            choices = getattr(chunk, "choices", None) or []
+            if not choices:
+                continue
+
+            delta = getattr(choices[0], "delta", None)
+            delta_content = self._field(delta, "content")
+            if delta_content is not None:
+                content_parts.append(str(delta_content))
+
+            for tool_call_delta in self._field(delta, "tool_calls") or []:
+                index = self._field(tool_call_delta, "index")
+                if index is None:
+                    index = len(tool_calls_by_index)
+                index = int(index)
+                tool_call = tool_calls_by_index.setdefault(
+                    index,
+                    {"id": "", "type": "function", "function": {"name": "", "arguments": ""}},
+                )
+
+                call_id = self._field(tool_call_delta, "id")
+                if call_id:
+                    tool_call["id"] = str(call_id)
+                call_type = self._field(tool_call_delta, "type")
+                if call_type:
+                    tool_call["type"] = str(call_type)
+
+                function_delta = self._field(tool_call_delta, "function") or {}
+                function_name = self._field(function_delta, "name")
+                if function_name:
+                    tool_call["function"]["name"] = str(function_name)
+                arguments_delta = self._field(function_delta, "arguments")
+                if arguments_delta is not None:
+                    tool_call["function"]["arguments"] += str(arguments_delta)
+
+        if not usage_payload:
+            global _warned_missing_stream_usage
+            if not _warned_missing_stream_usage:
+                logger.warning("LLM provider did not return stream usage; token analytics are unavailable")
+                _warned_missing_stream_usage = True
+
+        message: dict[str, Any] = {"role": "assistant", "content": "".join(content_parts)}
+        if tool_calls_by_index:
+            message["tool_calls"] = [
+                tool_call
+                for _, tool_call in sorted(tool_calls_by_index.items())
+                if tool_call["id"] or tool_call["function"]["name"] or tool_call["function"]["arguments"]
+            ]
+        return message, usage_payload
+
+    @staticmethod
+    def _field(value: Any, name: str) -> Any:
+        if isinstance(value, dict):
+            return value.get(name)
+        return getattr(value, name, None)
 
     @staticmethod
     def _tool_call_id(tool_call: Any) -> str:
@@ -714,41 +784,9 @@ class LLMService:
 
     def _create_chat_completion(self, client: OpenAI, **kwargs) -> tuple[str, dict[str, int | None]]:
         """Call chat completions in streaming mode and aggregate content plus usage."""
-        sanitized_kwargs = self._sanitize_chat_completion_kwargs(kwargs)
-        stream_kwargs = {**sanitized_kwargs, "stream": True, "stream_options": {"include_usage": True}}
-        try:
-            stream = client.chat.completions.create(**stream_kwargs)
-        except Exception:
-            fallback_kwargs = {**sanitized_kwargs, "stream": True}
-            stream = client.chat.completions.create(**fallback_kwargs)
-
-        content_parts: list[str] = []
-        usage_payload: dict[str, int | None] = {}
-        for chunk in stream:
-            usage = getattr(chunk, "usage", None)
-            if usage:
-                usage_payload = {
-                    "prompt_tokens": getattr(usage, "prompt_tokens", None),
-                    "completion_tokens": getattr(usage, "completion_tokens", None),
-                    "total_tokens": getattr(usage, "total_tokens", None),
-                }
-
-            choices = getattr(chunk, "choices", None) or []
-            if not choices:
-                continue
-
-            delta = getattr(choices[0], "delta", None)
-            delta_content = getattr(delta, "content", None)
-            if delta_content is not None:
-                content_parts.append(delta_content)
-
-        if not usage_payload:
-            global _warned_missing_stream_usage
-            if not _warned_missing_stream_usage:
-                logger.warning("LLM provider did not return stream usage; token analytics are unavailable")
-                _warned_missing_stream_usage = True
-
-        return "".join(content_parts), usage_payload
+        message, usage_payload = self._create_chat_completion_message(client, **kwargs)
+        content = message.get("content") if isinstance(message, dict) else getattr(message, "content", "")
+        return content or "", usage_payload
 
     def complete_chat(
         self,

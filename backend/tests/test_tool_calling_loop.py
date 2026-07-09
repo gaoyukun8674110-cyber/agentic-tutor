@@ -9,38 +9,21 @@ from app.services import llm_service as llm_module
 from app.services.llm_service import LLMService
 
 
-class FakeToolCallFunction:
-    def __init__(self, name, arguments):
-        self.name = name
-        self.arguments = arguments
+class FakeStreamChoice:
+    def __init__(self, delta):
+        self.delta = delta
 
 
-class FakeToolCall:
-    type = "function"
-
-    def __init__(self, call_id, name, arguments):
-        self.id = call_id
-        self.function = FakeToolCallFunction(name, json.dumps(arguments))
+class FakeUsage:
+    prompt_tokens = 10
+    completion_tokens = 5
+    total_tokens = 15
 
 
-class FakeMessage:
-    role = "assistant"
-
-    def __init__(self, content=None, tool_calls=None):
-        self.content = content
-        self.tool_calls = tool_calls
-
-
-class FakeChoice:
-    def __init__(self, message):
-        self.message = message
-
-
-class FakeResponse:
-    usage = None
-
-    def __init__(self, message):
-        self.choices = [FakeChoice(message)]
+class FakeStreamChunk:
+    def __init__(self, delta=None, usage=None):
+        self.choices = [] if delta is None else [FakeStreamChoice(delta)]
+        self.usage = usage
 
 
 class ToolCallingCompletions:
@@ -50,18 +33,27 @@ class ToolCallingCompletions:
     def create(self, **kwargs):
         self.calls.append(kwargs)
         if len(self.calls) == 1:
-            return FakeResponse(
-                FakeMessage(
-                    tool_calls=[
-                        FakeToolCall(
-                            "call-1",
-                            "web_search",
-                            {"query": "2026 AI agent news"},
-                        )
-                    ]
-                )
-            )
-        return FakeResponse(FakeMessage(content="Final answer with cited source."))
+            return [
+                FakeStreamChunk(
+                    {
+                        "tool_calls": [
+                            {
+                                "index": 0,
+                                "id": "call-1",
+                                "type": "function",
+                                "function": {"name": "web_search", "arguments": '{"query": '},
+                            }
+                        ]
+                    }
+                ),
+                FakeStreamChunk({"tool_calls": [{"index": 0, "function": {"arguments": '"2026 AI agent news"}'}}]}),
+                FakeStreamChunk(usage=FakeUsage()),
+            ]
+        return [
+            FakeStreamChunk({"content": "Final answer "}),
+            FakeStreamChunk({"content": "with cited source."}),
+            FakeStreamChunk(usage=FakeUsage()),
+        ]
 
 
 class FakeOpenAIClient:
@@ -141,6 +133,8 @@ class ToolCallingLoopTests(unittest.TestCase):
         self.assertIn("tools", completion_calls[0])
         self.assertEqual(completion_calls[0]["tool_choice"], "auto")
         self.assertEqual(completion_calls[1]["messages"][-1]["role"], "tool")
+        self.assertEqual(json.loads(completion_calls[1]["messages"][-1]["content"])["count"], 1)
+        self.assertTrue(all(call["stream"] is True for call in completion_calls))
 
     def test_complete_chat_rejects_disallowed_tool_call_without_crashing(self):
         service = LLMService()
@@ -165,6 +159,36 @@ class ToolCallingLoopTests(unittest.TestCase):
         self.assertEqual(result["message"]["content"], "Final answer with cited source.")
         tool_message = FakeOpenAIClient.instances[0].chat.completions.calls[1]["messages"][-1]
         self.assertIn("tool_not_allowed", tool_message["content"])
+        self.assertTrue(all(call["stream"] is True for call in FakeOpenAIClient.instances[0].chat.completions.calls))
+
+    def test_complete_chat_sanitizes_gpt5_tool_loop_payloads(self):
+        service = LLMService()
+        web_tool = FakeWebSearchTool()
+        registry = ToolRegistry({"web_search": web_tool})
+        ctx = AgentContext(user_id="alice", student_id=7, tools=registry)
+        resolved = self._resolved()
+        resolved.default_model = "gpt-5.5"
+
+        with patch.object(llm_module, "OpenAI", FakeOpenAIClient):
+            result = service.complete_chat(
+                resolved=resolved,
+                model=None,
+                messages=[{"role": "user", "content": "Search the web"}],
+                prompt_profile="socratic",
+                agent_type="tutor",
+                user_id="alice",
+                session_id=None,
+                analytics=None,
+                temperature=0.7,
+                tools=registry,
+                allowed_tools=["web_search"],
+                agent_context=ctx,
+            )
+
+        self.assertEqual(result["message"]["content"], "Final answer with cited source.")
+        completion_calls = FakeOpenAIClient.instances[0].chat.completions.calls
+        self.assertTrue(all(call["stream"] is True for call in completion_calls))
+        self.assertTrue(all("temperature" not in call for call in completion_calls))
 
 
 if __name__ == "__main__":
