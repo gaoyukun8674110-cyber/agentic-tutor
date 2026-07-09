@@ -504,9 +504,7 @@ class LLMService:
 
     def _sanitize_chat_completion_kwargs(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         sanitized = dict(kwargs)
-        unsupported_params = self._unsupported_chat_params_for_model(
-            str(sanitized.get("model") or "") or None
-        )
+        unsupported_params = self._unsupported_chat_params_for_model(str(sanitized.get("model") or "") or None)
         removed_params = sorted(param for param in unsupported_params if param in sanitized)
         for param in removed_params:
             sanitized.pop(param, None)

@@ -14,7 +14,15 @@ class FakeWebProvider:
         self.calls.append({"query": query, "max_results": max_results, "timeout": timeout})
         if self.fail:
             raise TimeoutError("offline")
-        return [{"content": "fresh answer", "source_label": "Source", "url": "https://example.com", "score": 0.8, "origin": "web"}]
+        return [
+            {
+                "content": "fresh answer",
+                "source_label": "Source",
+                "url": "https://example.com",
+                "score": 0.8,
+                "origin": "web",
+            }
+        ]
 
 
 class WebSearchRoutingTests(unittest.TestCase):
@@ -48,9 +56,13 @@ class WebSearchRoutingTests(unittest.TestCase):
         self.assertEqual(chunks[0]["origin"], "web")
 
     def test_tavily_provider_without_key_returns_fallback_with_or_without_proxy(self):
-        self.assertEqual(TavilyProvider(api_key=None).search("q", max_results=1, timeout=1)[0]["content"], FALLBACK_WEB_CONTENT)
         self.assertEqual(
-            TavilyProvider(api_key=None, proxy="socks5://127.0.0.1:10808").search("q", max_results=1, timeout=1)[0]["content"],
+            TavilyProvider(api_key=None).search("q", max_results=1, timeout=1)[0]["content"], FALLBACK_WEB_CONTENT
+        )
+        self.assertEqual(
+            TavilyProvider(api_key=None, proxy="socks5://127.0.0.1:10808").search("q", max_results=1, timeout=1)[0][
+                "content"
+            ],
             FALLBACK_WEB_CONTENT,
         )
 

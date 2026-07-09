@@ -30,13 +30,16 @@ class ReviewerAgent(BaseAgent):
         period = str(payload.get("period") or datetime.now().strftime("%Y-W%W"))
         summary = self._build_fallback_summary(weak_skills)
         if self.llm and payload.get("resolved") and not settings.E2E_MOCK_LLM:
-            summary = self._llm_summary(
-                resolved=payload["resolved"],
-                weak_skills=weak_skills,
-                user_id=ctx.user_id,
-                session_id=ctx.session_id,
-                analytics=payload.get("analytics"),
-            ) or summary
+            summary = (
+                self._llm_summary(
+                    resolved=payload["resolved"],
+                    weak_skills=weak_skills,
+                    user_id=ctx.user_id,
+                    session_id=ctx.session_id,
+                    analytics=payload.get("analytics"),
+                )
+                or summary
+            )
 
         report = {
             "summary": summary,
@@ -91,10 +94,7 @@ class ReviewerAgent(BaseAgent):
         session_id: int | None,
         analytics: Any,
     ) -> str | None:
-        prompt = (
-            "请为 AI Tutor 学生生成一段简短复盘建议，基于以下薄弱知识点，输出 120 字以内中文：\n"
-            f"{weak_skills}"
-        )
+        prompt = "请为 AI Tutor 学生生成一段简短复盘建议，基于以下薄弱知识点，输出 120 字以内中文：\n" f"{weak_skills}"
         result = self.llm.complete_chat(
             resolved=resolved,
             messages=[{"role": "user", "content": prompt}],

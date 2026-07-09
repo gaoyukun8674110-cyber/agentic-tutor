@@ -96,7 +96,8 @@ class TutorAgent(BaseAgent):
             prompt_profile=prompt_profile,
             system_prompt_override=payload.get("system_prompt_override"),
             tutor_context=tutor_context,
-            agent_type=payload.get("agent_type") or f"agent:tutor:{teaching_strategy}:{payload['resolved'].provider_id}",
+            agent_type=payload.get("agent_type")
+            or f"agent:tutor:{teaching_strategy}:{payload['resolved'].provider_id}",
             user_id=ctx.user_id,
             session_id=ctx.session_id,
             analytics=payload.get("analytics"),

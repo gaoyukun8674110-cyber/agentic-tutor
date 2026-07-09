@@ -29,7 +29,6 @@ def _httpx_proxy_kwarg() -> str:
     return "proxy" if (major, minor) >= (0, 26) else "proxies"
 
 
-
 class WebSearchProvider(Protocol):
     def search(self, query: str, *, max_results: int, timeout: float) -> list[dict[str, Any]]: ...
 

@@ -169,6 +169,17 @@ def _backfill_profiles(connection) -> None:
 
 def upgrade() -> None:
     connection = op.get_bind()
+    # The `students` table (and the rest of the base schema this migration
+    # builds on: student_masteries, question_skills, questions, ...) is created
+    # by the application's SQLAlchemy create_all() bootstrap, never by Alembic.
+    # When Alembic runs against a fresh database — e.g. CI's `alembic upgrade
+    # head` smoke test, which executes before the app boots — those base tables
+    # do not exist yet, so the FKs below cannot be created. In that case there
+    # is nothing to migrate: create_all() will build the full current schema
+    # (including every table and column this migration adds, all of which are
+    # registered models) at app startup.
+    if not _table_exists(connection, "students"):
+        return
     _create_tables(connection)
     _add_mastery_columns(connection)
     _backfill_skills(connection)

@@ -134,7 +134,9 @@ class ReviewScheduler:
     def start(self) -> None:
         if not self.scheduler:
             return
-        self.scheduler.add_job(self.run_due_reviews, "interval", hours=6, id="agentic_review_due", replace_existing=True)
+        self.scheduler.add_job(
+            self.run_due_reviews, "interval", hours=6, id="agentic_review_due", replace_existing=True
+        )
         self.scheduler.start()
 
     def shutdown(self) -> None:

@@ -35,9 +35,7 @@ class LearnerStoreTool:
 
         return {
             "student_id": student_id,
-            "weak_skills": [
-                item for item in mastery_payloads[:weak_limit] if item["effective_mastery"] < 0.7
-            ],
+            "weak_skills": [item for item in mastery_payloads[:weak_limit] if item["effective_mastery"] < 0.7],
             "masteries": mastery_payloads,
             "learning_style": dict(profile.learning_style or {}) if profile else {},
             "review_enabled": bool(profile.review_enabled) if profile else True,

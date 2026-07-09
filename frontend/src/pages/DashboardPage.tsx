@@ -100,7 +100,12 @@ export function DashboardPage() {
             </p>
             <p
               className="tabular-nums"
-              style={{ color: tokens.textPrimary, fontFamily: serif, fontWeight: 700, fontSize: 32 }}
+              style={{
+                color: tokens.textPrimary,
+                fontFamily: serif,
+                fontWeight: 700,
+                fontSize: 32,
+              }}
             >
               {item.value}
             </p>
@@ -131,13 +136,24 @@ export function DashboardPage() {
               >
                 <span
                   aria-hidden
-                  style={{ display: 'inline-block', width: 22, height: 1, background: tokens.accentPrimary }}
+                  style={{
+                    display: 'inline-block',
+                    width: 22,
+                    height: 1,
+                    background: tokens.accentPrimary,
+                  }}
                 />
                 {t('今日', 'Today')} · {greeting}
               </p>
               <h2
                 className="mb-3"
-                style={{ fontFamily: serif, fontWeight: 700, fontSize: 34, lineHeight: 1.25, letterSpacing: '0.01em' }}
+                style={{
+                  fontFamily: serif,
+                  fontWeight: 700,
+                  fontSize: 34,
+                  lineHeight: 1.25,
+                  letterSpacing: '0.01em',
+                }}
               >
                 {t('墨已研好，', 'The ink is ready — ')}
                 <span style={{ color: tokens.accentPrimary }}>
@@ -174,11 +190,13 @@ export function DashboardPage() {
                 }}
                 aria-hidden
               >
-                {t('诊断\n已落', 'seen').split('\n').map((line, index) => (
-                  <span key={index} style={{ display: 'block' }}>
-                    {line}
-                  </span>
-                ))}
+                {t('诊断\n已落', 'seen')
+                  .split('\n')
+                  .map((line, index) => (
+                    <span key={index} style={{ display: 'block' }}>
+                      {line}
+                    </span>
+                  ))}
               </span>
               <p
                 className="mb-2 text-xs uppercase"
@@ -196,7 +214,10 @@ export function DashboardPage() {
                     : t('尚未开始', 'not yet started')}
                 </b>
                 {streakDays > 0
-                  ? t(`，已连续 ${streakDays} 天。保持这个节奏。`, `, ${streakDays} days in a row. Keep this rhythm.`)
+                  ? t(
+                      `，已连续 ${streakDays} 天。保持这个节奏。`,
+                      `, ${streakDays} days in a row. Keep this rhythm.`,
+                    )
                   : t('。今日迈出第一步。', '. Take the first step today.')}
               </p>
             </aside>

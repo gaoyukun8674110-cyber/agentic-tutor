@@ -134,8 +134,7 @@ def run_teaching_policy_assertions(cases: list[dict[str, Any]]) -> dict[str, Any
         )
         if actual_strategy != expected_strategy:
             raise ValueError(
-                f"Case {case['id']} expected teaching strategy '{expected_strategy}' "
-                f"but got '{actual_strategy}'"
+                f"Case {case['id']} expected teaching strategy '{expected_strategy}' " f"but got '{actual_strategy}'"
             )
         checked += 1
 

@@ -11,11 +11,8 @@
   --ai-sans: 'Inter', 'Noto Sans SC', 'Segoe UI', sans-serif;
 
   --ai-page-gradient: linear-gradient(180deg, #f1ece1 0%, #ebe4d6 100%);
-  --ai-overlay-gradient: radial-gradient(
-      circle at 82% -6%,
-      rgba(94, 122, 110, 0.08),
-      transparent 46%
-    ),
+  --ai-overlay-gradient:
+    radial-gradient(circle at 82% -6%, rgba(94, 122, 110, 0.08), transparent 46%),
     radial-gradient(circle at 4% 108%, rgba(176, 141, 87, 0.06), transparent 42%);
   --ai-surface: #fbf8f1;
   --ai-surface-muted: #f4efe4;
@@ -76,11 +73,8 @@
 
 body[data-theme='dark'] {
   --ai-page-gradient: linear-gradient(180deg, #14171b 0%, #191d22 100%);
-  --ai-overlay-gradient: radial-gradient(
-      circle at 82% -4%,
-      rgba(122, 156, 140, 0.08),
-      transparent 46%
-    ),
+  --ai-overlay-gradient:
+    radial-gradient(circle at 82% -4%, rgba(122, 156, 140, 0.08), transparent 46%),
     radial-gradient(circle at 4% 108%, rgba(176, 141, 87, 0.06), transparent 42%);
   --ai-surface: #20252b;
   --ai-surface-muted: #1b2026;
