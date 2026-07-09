@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     WEB_SEARCH_MAX_RESULTS: int = 3
     WEB_SEARCH_TIMEOUT: float = 8.0
     RAG_MIN_SCORE: float = 0.35
+    RAG_MATERIAL_MIN_SCORE: float = 0.35
+    AGENT_TOOL_CALLING_ENABLED: bool = True
+    MAX_TOOL_ITERATIONS: int = 4
 
     # OpenAI-compatible chat providers
     DEEPSEEK_API_KEY: str | None = None

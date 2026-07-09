@@ -45,7 +45,7 @@ class TeachingPolicy:
 
 class TutorAgent(BaseAgent):
     name = "tutor"
-    allowed_tools = ["retriever", "learner_store"]
+    allowed_tools = ["retrieve_materials", "web_search", "calculate", "get_learner_profile"]
 
     STRATEGY_PROMPT_PROFILE = {
         "explain": "explain",
@@ -101,18 +101,22 @@ class TutorAgent(BaseAgent):
             user_id=ctx.user_id,
             session_id=ctx.session_id,
             analytics=payload.get("analytics"),
+            tools=ctx.tools,
+            allowed_tools=self.allowed_tools,
+            agent_context=ctx,
         )
         if "error" not in result:
             result["agent_type"] = "tutor"
             result["teaching_strategy"] = teaching_strategy
-            result["used_tools"] = used_tools
-            result["web_search_used"] = "web_search" in used_tools
+            merged_used_tools = list(dict.fromkeys([*used_tools, *list(result.get("used_tools") or [])]))
+            result["used_tools"] = merged_used_tools
+            result["web_search_used"] = "web_search" in merged_used_tools
             result["learner_snapshot"] = learner_snapshot
 
         return AgentResult(
             content=result.get("message", {}).get("content"),
             state_updates={"teaching_strategy": teaching_strategy, "learner_snapshot": learner_snapshot},
-            used_tools=used_tools,
+            used_tools=list(result.get("used_tools") or used_tools),
             agent_type="tutor",
             raw=result,
         )

@@ -43,6 +43,17 @@ class LearnerStoreTool:
             "confidence_calibration": dict(profile.confidence_calibration or {}) if profile else {},
         }
 
+    def invoke(self, args: dict[str, Any], ctx: Any) -> dict[str, Any]:
+        student_id = getattr(ctx, "student_id", None)
+        if not student_id:
+            return {"error": "student_id_unavailable"}
+        weak_limit = args.get("weak_limit")
+        try:
+            parsed_weak_limit = int(weak_limit) if weak_limit is not None else 3
+        except (TypeError, ValueError):
+            parsed_weak_limit = 3
+        return self.snapshot(int(student_id), weak_limit=max(1, min(parsed_weak_limit, 10)))
+
     def ensure_profile(self, student_id: int) -> LearnerProfile:
         profile = self.db.query(LearnerProfile).filter(LearnerProfile.student_id == student_id).first()
         if profile:

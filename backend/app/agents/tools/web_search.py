@@ -133,3 +133,11 @@ class WebSearchTool:
 
         self._cache[cache_key] = (now, [dict(item) for item in chunks])
         return chunks
+
+    def invoke(self, args: dict[str, Any], ctx: Any) -> dict[str, Any]:
+        del ctx
+        query = str(args.get("query") or "").strip()
+        if not query:
+            return {"chunks": [], "error": "query_required"}
+        chunks = self.search(query)
+        return {"chunks": chunks, "count": len(chunks)}

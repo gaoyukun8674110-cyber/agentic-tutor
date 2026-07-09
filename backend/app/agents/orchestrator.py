@@ -44,6 +44,9 @@ class Orchestrator:
             user_id=user_id,
             student_id=student_id,
             session_id=session_id,
+            material_ids=(
+                tutor_context.get("material_ids") if isinstance(tutor_context.get("material_ids"), list) else None
+            ),
             learner_snapshot=dict(tutor_context.get("learner_snapshot") or {}),
             signals=dict(tutor_context.get("signals") or {}),
             tools=self.tools,

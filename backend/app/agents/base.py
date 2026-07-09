@@ -22,6 +22,7 @@ class AgentContext:
     user_id: str
     student_id: int | None = None
     session_id: int | None = None
+    material_ids: list[int] | None = None
     learner_snapshot: dict[str, Any] = field(default_factory=dict)
     signals: dict[str, Any] = field(default_factory=dict)
     tools: ToolRegistryProtocol | None = None

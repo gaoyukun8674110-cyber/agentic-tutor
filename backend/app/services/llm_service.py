@@ -1,5 +1,6 @@
 """LLM 服务 - 统一模型管理、多角色 Agent、工具集成"""
 
+import json
 import logging
 import time
 from fnmatch import fnmatchcase
@@ -17,6 +18,8 @@ logger = logging.getLogger(__name__)
 _warned_missing_stream_usage = False
 
 if TYPE_CHECKING:
+    from app.agents.base import AgentContext
+    from app.agents.tools import ToolRegistry
     from app.services.llm_credential_resolver import ResolvedProvider
 
 
@@ -353,11 +356,17 @@ class LLMService:
         if not isinstance(raw_chunks, list) or not raw_chunks:
             return []
 
+        has_web_chunks = any(isinstance(chunk, dict) and chunk.get("origin") == "web" for chunk in raw_chunks)
         lines = [
             "",
             "当前检索到的学习资料片段：",
             "请优先使用这些资料片段回答；引用资料时标出对应来源。如果资料片段没有覆盖学生问题，请明确说明当前资料没有覆盖，再用通用知识做引导或追问。",
         ]
+        if has_web_chunks:
+            lines.append(
+                "Live web search was performed for this turn. Web chunks are marked with origin=web; "
+                "answer from them when relevant, cite the source URL, and do not claim that web search is unavailable."
+            )
         included = 0
         for index, chunk in enumerate(raw_chunks[:5], start=1):
             if not isinstance(chunk, dict):
@@ -518,6 +527,191 @@ class LLMService:
 
         return sanitized
 
+    @staticmethod
+    def _tool_name_aliases(name: str) -> set[str]:
+        aliases = {
+            "retrieve_materials": {"retrieve_materials", "retriever"},
+            "web_search": {"web_search"},
+            "calculate": {"calculate", "math"},
+            "get_learner_profile": {"get_learner_profile", "learner_store"},
+        }
+        return aliases.get(name, {name})
+
+    def _build_tool_schemas(self, allowed_tools: list[str] | None = None) -> list[dict[str, Any]]:
+        allowed = set(allowed_tools or ["retrieve_materials", "web_search", "calculate", "get_learner_profile"])
+
+        def is_allowed(function_name: str) -> bool:
+            return bool(self._tool_name_aliases(function_name) & allowed)
+
+        schemas = {
+            "retrieve_materials": {
+                "type": "function",
+                "function": {
+                    "name": "retrieve_materials",
+                    "description": "Search the learner's selected study materials for passages relevant to the query.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string"},
+                            "material_ids": {"type": "array", "items": {"type": "integer"}},
+                        },
+                        "required": ["query"],
+                    },
+                },
+            },
+            "web_search": {
+                "type": "function",
+                "function": {
+                    "name": "web_search",
+                    "description": "Search the web for current or external information and source URLs.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"query": {"type": "string"}},
+                        "required": ["query"],
+                    },
+                },
+            },
+            "calculate": {
+                "type": "function",
+                "function": {
+                    "name": "calculate",
+                    "description": "Calculate or simplify a math expression.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "expression": {"type": "string"},
+                            "variables": {"type": "object", "additionalProperties": {"type": "number"}},
+                        },
+                        "required": ["expression"],
+                    },
+                },
+            },
+            "get_learner_profile": {
+                "type": "function",
+                "function": {
+                    "name": "get_learner_profile",
+                    "description": "Get the current learner profile, weak skills, and mastery snapshot.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"weak_limit": {"type": "integer", "minimum": 1, "maximum": 10}},
+                    },
+                },
+            },
+        }
+        return [schema for name, schema in schemas.items() if is_allowed(name)]
+
+    @staticmethod
+    def _response_usage_payload(response: Any) -> dict[str, int | None]:
+        usage = getattr(response, "usage", None)
+        if not usage:
+            return {}
+        return {
+            "prompt_tokens": getattr(usage, "prompt_tokens", None),
+            "completion_tokens": getattr(usage, "completion_tokens", None),
+            "total_tokens": getattr(usage, "total_tokens", None),
+        }
+
+    @staticmethod
+    def _message_to_openai_dict(message: Any) -> dict[str, Any]:
+        if isinstance(message, dict):
+            return dict(message)
+        payload: dict[str, Any] = {
+            "role": getattr(message, "role", "assistant"),
+            "content": getattr(message, "content", None),
+        }
+        tool_calls = getattr(message, "tool_calls", None)
+        if tool_calls:
+            payload["tool_calls"] = [
+                {
+                    "id": getattr(tool_call, "id", ""),
+                    "type": getattr(tool_call, "type", "function"),
+                    "function": {
+                        "name": getattr(getattr(tool_call, "function", None), "name", ""),
+                        "arguments": getattr(getattr(tool_call, "function", None), "arguments", "{}"),
+                    },
+                }
+                for tool_call in tool_calls
+            ]
+        return payload
+
+    def _create_chat_completion_message(
+        self,
+        client: OpenAI,
+        **kwargs,
+    ) -> tuple[Any, dict[str, int | None]]:
+        """Call chat completions once and return the assistant message, preserving tool_calls."""
+        sanitized_kwargs = self._sanitize_chat_completion_kwargs(kwargs)
+        response = client.chat.completions.create(**sanitized_kwargs)
+        choices = getattr(response, "choices", None) or []
+        message = getattr(choices[0], "message", {"role": "assistant", "content": ""}) if choices else {}
+        return message, self._response_usage_payload(response)
+
+    @staticmethod
+    def _tool_call_id(tool_call: Any) -> str:
+        if isinstance(tool_call, dict):
+            return str(tool_call.get("id") or "")
+        return str(getattr(tool_call, "id", "") or "")
+
+    @staticmethod
+    def _tool_call_name(tool_call: Any) -> str:
+        function = tool_call.get("function") if isinstance(tool_call, dict) else getattr(tool_call, "function", None)
+        if isinstance(function, dict):
+            return str(function.get("name") or "")
+        return str(getattr(function, "name", "") or "")
+
+    @staticmethod
+    def _tool_call_arguments(tool_call: Any) -> dict[str, Any]:
+        function = tool_call.get("function") if isinstance(tool_call, dict) else getattr(tool_call, "function", None)
+        raw_arguments = (
+            function.get("arguments") if isinstance(function, dict) else getattr(function, "arguments", "{}")
+        )
+        if isinstance(raw_arguments, dict):
+            return raw_arguments
+        try:
+            parsed = json.loads(raw_arguments or "{}")
+        except (TypeError, json.JSONDecodeError):
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+
+    def _resolve_tool(self, registry: "ToolRegistry", function_name: str) -> Any:
+        registry_names = {
+            "retrieve_materials": "retriever",
+            "web_search": "web_search",
+            "calculate": "math",
+            "get_learner_profile": "learner_store",
+        }
+        return registry.get(registry_names.get(function_name, function_name))
+
+    def _invoke_tool_call(
+        self,
+        tool_call: Any,
+        *,
+        tools: "ToolRegistry",
+        allowed_tools: set[str],
+        agent_context: "AgentContext",
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        started_at = time.time()
+        function_name = self._tool_call_name(tool_call)
+        arguments = self._tool_call_arguments(tool_call)
+        trace = {"tool": function_name, "arguments": arguments}
+        try:
+            if not (self._tool_name_aliases(function_name) & allowed_tools):
+                result = {"error": "tool_not_allowed", "tool": function_name}
+            else:
+                tool = self._resolve_tool(tools, function_name)
+                invoke = getattr(tool, "invoke", None)
+                if not callable(invoke):
+                    result = {"error": "tool_not_invokable", "tool": function_name}
+                else:
+                    result = invoke(arguments, agent_context)
+        except Exception as error:
+            result = {"error": "tool_execution_failed", "detail": str(error)}
+
+        duration_ms = (time.time() - started_at) * 1000
+        trace["duration_ms"] = duration_ms
+        trace["ok"] = "error" not in result
+        return result, trace
+
     def _create_chat_completion(self, client: OpenAI, **kwargs) -> tuple[str, dict[str, int | None]]:
         """Call chat completions in streaming mode and aggregate content plus usage."""
         sanitized_kwargs = self._sanitize_chat_completion_kwargs(kwargs)
@@ -571,6 +765,9 @@ class LLMService:
         session_id: int | None,
         analytics: AnalyticsService | None,
         model: str | None = None,
+        tools: "ToolRegistry | None" = None,
+        allowed_tools: list[str] | None = None,
+        agent_context: "AgentContext | None" = None,
     ) -> dict[str, Any]:
         """Generate a reply using an already resolved user/global provider."""
         selected_model = model or resolved.default_model
@@ -599,21 +796,87 @@ class LLMService:
         client = None
         try:
             client = OpenAI(api_key=resolved.api_key, base_url=resolved.base_url)
-            content, usage_payload = self._create_chat_completion(
-                client,
-                model=selected_model,
-                messages=chat_messages,
-                temperature=temperature if temperature is not None else settings.OPENAI_TEMPERATURE,
-                max_tokens=max_tokens if max_tokens is not None else settings.OPENAI_MAX_TOKENS,
-                timeout=60,
-            )
+            usage_payload: dict[str, int | None] = {}
+            used_tools = list(dict.fromkeys(normalized_tutor_context.get("used_tools") or []))
+            tool_trace: list[dict[str, Any]] = []
+            tool_schemas = self._build_tool_schemas(allowed_tools) if tools and agent_context else []
+            tool_calling_enabled = bool(getattr(settings, "AGENT_TOOL_CALLING_ENABLED", True))
+            common_kwargs = {
+                "model": selected_model,
+                "temperature": temperature if temperature is not None else settings.OPENAI_TEMPERATURE,
+                "max_tokens": max_tokens if max_tokens is not None else settings.OPENAI_MAX_TOKENS,
+                "timeout": 60,
+            }
+
+            if tool_calling_enabled and tool_schemas and tools and agent_context:
+                tool_messages = list(chat_messages)
+                allowed_tool_names = set(allowed_tools or [])
+                if not allowed_tool_names:
+                    allowed_tool_names = {"retrieve_materials", "web_search", "calculate", "get_learner_profile"}
+
+                final_message: Any = {"role": "assistant", "content": ""}
+                max_iterations = max(1, int(getattr(settings, "MAX_TOOL_ITERATIONS", 4)))
+                for _ in range(max_iterations):
+                    message, call_usage = self._create_chat_completion_message(
+                        client,
+                        messages=tool_messages,
+                        tools=tool_schemas,
+                        tool_choice="auto",
+                        **common_kwargs,
+                    )
+                    usage_payload = call_usage or usage_payload
+                    final_message = message
+                    tool_calls = getattr(message, "tool_calls", None)
+                    if isinstance(message, dict):
+                        tool_calls = message.get("tool_calls")
+                    if not tool_calls:
+                        break
+
+                    tool_messages.append(self._message_to_openai_dict(message))
+                    for tool_call in tool_calls:
+                        function_name = self._tool_call_name(tool_call)
+                        result, trace = self._invoke_tool_call(
+                            tool_call,
+                            tools=tools,
+                            allowed_tools=allowed_tool_names,
+                            agent_context=agent_context,
+                        )
+                        tool_trace.append(trace)
+                        if function_name and function_name not in used_tools:
+                            used_tools.append(function_name)
+                        tool_messages.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": self._tool_call_id(tool_call),
+                                "content": json.dumps(result, ensure_ascii=False, default=str),
+                            }
+                        )
+                else:
+                    final_message, call_usage = self._create_chat_completion_message(
+                        client,
+                        messages=tool_messages,
+                        **common_kwargs,
+                    )
+                    usage_payload = call_usage or usage_payload
+
+                content = getattr(final_message, "content", None)
+                if isinstance(final_message, dict):
+                    content = final_message.get("content")
+                content = content or ""
+                chat_messages = tool_messages
+            else:
+                content, usage_payload = self._create_chat_completion(
+                    client,
+                    messages=chat_messages,
+                    **common_kwargs,
+                )
             duration_ms = (time.time() - start_time) * 1000
 
             self._safe_log_llm_call(
                 user_id=user_id,
                 session_id=session_id,
                 agent_type=agent_type,
-                prompt_length=sum(len(message["content"]) for message in chat_messages),
+                prompt_length=sum(len(str(message.get("content") or "")) for message in chat_messages),
                 response_length=len(content or ""),
                 duration_ms=duration_ms,
                 analytics=analytics,
@@ -629,6 +892,8 @@ class LLMService:
                 "latency_ms": duration_ms,
                 "credential_source": resolved.source,
                 "credential_fingerprint": resolved.fingerprint,
+                "used_tools": used_tools,
+                "tool_trace": tool_trace,
             }
         except Exception as e:
             return {"error": safe_llm_error(e)}

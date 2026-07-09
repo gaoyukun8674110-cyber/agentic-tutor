@@ -227,26 +227,49 @@ def should_web_search(
     *,
     fact_check_required: bool = False,
     rag_min_score: float | None = None,
+    allow_empty_rag_fallback: bool = False,
 ) -> bool:
     text = (user_message or "").strip().lower()
     if not text:
         return False
 
-    explicit_keywords = ["联网", "搜一下", "查一下最新", "网上查", "web search", "search the web", "look up"]
-    timely_keywords = ["最新", "今年", "版本", "赛事", "新闻", "today", "latest", "current", "2026"]
+    explicit_keywords = [
+        "\u8054\u7f51",
+        "\u641c\u7d22",
+        "\u641c\u4e00\u4e0b",
+        "\u67e5\u4e00\u4e0b",
+        "\u7f51\u4e0a\u67e5",
+        "\u80fd\u4e0d\u80fd\u8054\u7f51",
+        "\u53ef\u4ee5\u8054\u7f51",
+        "web search",
+        "search the web",
+        "browse the web",
+        "look up",
+        "search online",
+    ]
+    timely_keywords = [
+        "\u6700\u65b0",
+        "\u4eca\u5e74",
+        "\u7248\u672c",
+        "\u8d5b\u4e8b",
+        "\u65b0\u95fb",
+        "today",
+        "latest",
+        "current",
+        "recent",
+        "news",
+        "2026",
+    ]
     if any(keyword in text for keyword in explicit_keywords):
         return True
     if fact_check_required:
         return True
     if any(keyword in text for keyword in timely_keywords):
         return True
-    if not retrieved_chunks:
-        return True
-
     threshold = settings.RAG_MIN_SCORE if rag_min_score is None else rag_min_score
     scores = [chunk.get("score") for chunk in retrieved_chunks if isinstance(chunk.get("score"), int | float)]
     if not scores:
-        return True
+        return allow_empty_rag_fallback
     return max(float(score) for score in scores) < threshold
 
 
@@ -264,7 +287,7 @@ def _inject_material_context(
         return next_context, []
 
     selected_material_ids = _normalize_material_ids(next_context.get("material_ids"))
-    if "material_ids" in next_context and not selected_material_ids:
+    if not selected_material_ids:
         next_context.pop("material_context", None)
         return next_context, []
 
@@ -274,11 +297,16 @@ def _inject_material_context(
         material_ids=selected_material_ids,
         top_k=top_k,
     )
-    if chunks:
-        next_context["material_context"] = {"chunks": chunks}
+    next_context["_material_search_attempted"] = True
+    min_score = settings.RAG_MATERIAL_MIN_SCORE
+    relevant_chunks = [
+        chunk for chunk in chunks if isinstance(chunk.get("score"), int | float) and float(chunk["score"]) >= min_score
+    ]
+    if relevant_chunks:
+        next_context["material_context"] = {"chunks": relevant_chunks}
     else:
         next_context.pop("material_context", None)
-    return next_context, chunks
+    return next_context, relevant_chunks
 
 
 def _inject_web_context(
@@ -288,10 +316,12 @@ def _inject_web_context(
     tools: ToolRegistry | None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     next_context = dict(tutor_context)
+    material_search_attempted = bool(next_context.pop("_material_search_attempted", False))
     if not should_web_search(
         last_user_message,
         retrieved_chunks,
         fact_check_required=bool(next_context.get("fact_check_required")),
+        allow_empty_rag_fallback=material_search_attempted,
     ):
         next_context["web_search_used"] = False
         return next_context, []
@@ -338,31 +368,34 @@ def _prepare_tutor_context(
     tutor_context["learning_phase"] = learning_phase
 
     retrieved_material_chunks: list[dict[str, Any]] = []
-    try:
-        material_service = MaterialService(db)
-        tutor_context, retrieved_material_chunks = _inject_material_context(
-            tutor_context=tutor_context,
-            last_user_message=last_user_message,
-            material_service=material_service,
-            user_id=user_id,
-            top_k=settings.RAG_TOP_K,
-        )
-    except Exception:
-        tutor_context["material_context_error"] = "Material search is temporarily unavailable"
-
-    web_chunks: list[dict[str, Any]] = []
-    try:
-        tutor_context, web_chunks = _inject_web_context(
-            tutor_context=tutor_context,
-            last_user_message=last_user_message,
-            retrieved_chunks=retrieved_material_chunks,
-            tools=tools,
-        )
-    except Exception:
+    if settings.AGENT_TOOL_CALLING_ENABLED:
         tutor_context["web_search_used"] = False
+    else:
+        try:
+            material_service = MaterialService(db)
+            tutor_context, retrieved_material_chunks = _inject_material_context(
+                tutor_context=tutor_context,
+                last_user_message=last_user_message,
+                material_service=material_service,
+                user_id=user_id,
+                top_k=settings.RAG_TOP_K,
+            )
+        except Exception:
+            tutor_context["material_context_error"] = "Material search is temporarily unavailable"
 
-    if web_chunks:
-        retrieved_material_chunks = [*retrieved_material_chunks, *web_chunks]
+        web_chunks: list[dict[str, Any]] = []
+        try:
+            tutor_context, web_chunks = _inject_web_context(
+                tutor_context=tutor_context,
+                last_user_message=last_user_message,
+                retrieved_chunks=retrieved_material_chunks,
+                tools=tools,
+            )
+        except Exception:
+            tutor_context["web_search_used"] = False
+
+        if web_chunks:
+            retrieved_material_chunks = [*retrieved_material_chunks, *web_chunks]
 
     return tutor_context, retrieved_material_chunks, last_user_message, learning_phase
 

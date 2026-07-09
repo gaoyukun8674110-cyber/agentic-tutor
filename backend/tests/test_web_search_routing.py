@@ -27,25 +27,38 @@ class FakeWebProvider:
 
 class WebSearchRoutingTests(unittest.TestCase):
     def test_should_web_search_trigger_cases(self):
-        self.assertTrue(should_web_search("请联网查一下", [{"score": 0.9}]))
-        self.assertTrue(should_web_search("今年最新版本是什么", [{"score": 0.9}]))
-        self.assertTrue(should_web_search("需要核实", [{"score": 0.9}], fact_check_required=True))
-        self.assertTrue(should_web_search("普通问题", []))
-        self.assertTrue(should_web_search("普通问题", [{"score": 0.1}], rag_min_score=0.35))
+        self.assertTrue(should_web_search("please search the web", [{"score": 0.9}]))
+        self.assertTrue(should_web_search("can you browse the web?", [{"score": 0.9}]))
+        self.assertTrue(should_web_search("what is the latest version?", [{"score": 0.9}]))
+        self.assertTrue(should_web_search("needs fact check", [{"score": 0.9}], fact_check_required=True))
+        self.assertTrue(should_web_search("normal question", [{"score": 0.1}], rag_min_score=0.35))
 
-    def test_should_web_search_skips_when_rag_score_is_high(self):
-        self.assertFalse(should_web_search("普通问题", [{"score": 0.8}], rag_min_score=0.35))
+    def test_should_web_search_skips_when_not_needed(self):
+        self.assertFalse(should_web_search("normal question", [{"score": 0.8}], rag_min_score=0.35))
+        self.assertFalse(should_web_search("normal question", [], rag_min_score=0.35))
+        self.assertTrue(should_web_search("normal question", [], rag_min_score=0.35, allow_empty_rag_fallback=True))
 
     def test_inject_web_context_adds_chunks_and_used_tool(self):
         provider = FakeWebProvider()
         tools = ToolRegistry({"web_search": WebSearchTool(provider=provider)})
 
-        context, chunks = _inject_web_context({}, "请联网查一下", [{"score": 0.9}], tools)
+        context, chunks = _inject_web_context({}, "please search the web", [{"score": 0.9}], tools)
 
         self.assertTrue(context["web_search_used"])
         self.assertIn("web_search", context["used_tools"])
         self.assertEqual(chunks[0]["origin"], "web")
-        self.assertEqual(provider.calls[0]["query"], "请联网查一下")
+        self.assertEqual(provider.calls[0]["query"], "please search the web")
+
+    def test_inject_web_context_uses_empty_rag_fallback_only_after_material_search(self):
+        provider = FakeWebProvider()
+        tools = ToolRegistry({"web_search": WebSearchTool(provider=provider)})
+
+        context, chunks = _inject_web_context({"_material_search_attempted": True}, "normal question", [], tools)
+
+        self.assertTrue(context["web_search_used"])
+        self.assertNotIn("_material_search_attempted", context)
+        self.assertEqual(chunks[0]["origin"], "web")
+        self.assertEqual(provider.calls[0]["query"], "normal question")
 
     def test_web_search_failure_degrades_to_fallback_chunk(self):
         tool = WebSearchTool(provider=FakeWebProvider(fail=True))
